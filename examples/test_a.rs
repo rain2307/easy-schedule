@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
+use easy_schedule::{ScheduledTask, Scheduler, Skip, Task};
 use time::OffsetDateTime;
-use easy_schedule::{Create, ScheduledTask, Scheduler, Skip};
 
 #[derive(Debug, Clone)]
 struct WaitTask;
 
 impl ScheduledTask for WaitTask {
-    fn get_schedule(&self) -> Create {
-        Create::Wait(3, None)
+    fn get_schedule(&self) -> Task {
+        Task::Wait(3, None)
     }
 
     fn on_time(&self) {
@@ -24,9 +24,9 @@ impl ScheduledTask for WaitTask {
 struct IntervalTask;
 
 impl ScheduledTask for IntervalTask {
-    fn get_schedule(&self) -> Create {
-        // Create::Interval(10, None)
-        Create::Interval(10, Some(Skip::Day(7)))
+    fn get_schedule(&self) -> Task {
+        // Task::Interval(10, None)
+        Task::Interval(10, Some(Skip::Day(7)))
     }
 
     fn on_time(&self) {
@@ -42,10 +42,10 @@ impl ScheduledTask for IntervalTask {
 struct AtTask;
 
 impl ScheduledTask for AtTask {
-    fn get_schedule(&self) -> Create {
+    fn get_schedule(&self) -> Task {
         let now = OffsetDateTime::now_local().unwrap();
         let next = now + time::Duration::minutes(1);
-        Create::At(next.time(), None)
+        Task::At(next.time(), None)
     }
 
     fn on_time(&self) {
@@ -61,10 +61,10 @@ impl ScheduledTask for AtTask {
 struct OnceTask;
 
 impl ScheduledTask for OnceTask {
-    fn get_schedule(&self) -> Create {
+    fn get_schedule(&self) -> Task {
         let now = OffsetDateTime::now_local().unwrap();
         let next = now + time::Duration::minutes(2);
-        Create::Once(next)
+        Task::Once(next)
     }
 
     fn on_time(&self) {

@@ -80,7 +80,7 @@ impl Skip {
 }
 
 #[derive(Debug, Clone)]
-pub enum Create {
+pub enum Task {
     /// wait seconds
     Wait(u64, Option<Skip>),
     /// interval seconds
@@ -91,13 +91,13 @@ pub enum Create {
     Once(OffsetDateTime),
 }
 
-impl fmt::Display for Create {
+impl fmt::Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Create::Wait(wait, skip) => {
+            Task::Wait(wait, skip) => {
                 write!(f, "wait: {} {}", wait, skip.clone().unwrap_or_default())
             }
-            Create::Interval(interval, skip) => {
+            Task::Interval(interval, skip) => {
                 write!(
                     f,
                     "interval: {} {}",
@@ -105,10 +105,10 @@ impl fmt::Display for Create {
                     skip.clone().unwrap_or_default()
                 )
             }
-            Create::At(time, skip) => {
+            Task::At(time, skip) => {
                 write!(f, "at: {} {}", time, skip.clone().unwrap_or_default())
             }
-            Create::Once(time) => write!(f, "once: {}", time),
+            Task::Once(time) => write!(f, "once: {}", time),
         }
     }
 }
@@ -116,7 +116,7 @@ impl fmt::Display for Create {
 /// a task that can be scheduled
 pub trait ScheduledTask: Debug + Sync + Send {
     /// get the schedule type
-    fn get_schedule(&self) -> Create;
+    fn get_schedule(&self) -> Task;
 
     /// called when the task is scheduled
     fn on_time(&self);
@@ -168,16 +168,16 @@ impl Scheduler {
             let cancel = self.cancel.clone();
             let task = task.clone();
             match schedule {
-                Create::Wait(..) => {
+                Task::Wait(..) => {
                     Scheduler::run_wait(task, cancel.clone()).await;
                 }
-                Create::Interval(..) => {
+                Task::Interval(..) => {
                     Scheduler::run_interval(task, cancel.clone()).await;
                 }
-                Create::At(..) => {
+                Task::At(..) => {
                     Scheduler::run_at(task, cancel.clone()).await;
                 }
-                Create::Once(..) => {
+                Task::Once(..) => {
                     Scheduler::run_once(task, cancel.clone()).await;
                 }
             }
@@ -214,7 +214,7 @@ impl Scheduler {
     /// run wait task
     #[instrument(skip(task, cancel))]
     async fn run_wait(task: Arc<Box<dyn ScheduledTask>>, cancel: CancellationToken) {
-        if let Create::Wait(wait, skip) = task.get_schedule() {
+        if let Task::Wait(wait, skip) = task.get_schedule() {
             tokio::spawn(async move {
                 select! {
                     _ = cancel.cancelled() => {
@@ -241,7 +241,7 @@ impl Scheduler {
     /// run interval task
     #[instrument(skip(task, cancel))]
     async fn run_interval(task: Arc<Box<dyn ScheduledTask>>, cancel: CancellationToken) {
-        if let Create::Interval(interval, skip) = task.get_schedule() {
+        if let Task::Interval(interval, skip) = task.get_schedule() {
             tokio::spawn(async move {
                 loop {
                     select! {
@@ -269,7 +269,7 @@ impl Scheduler {
     /// run at task
     #[instrument(skip(task, cancel))]
     async fn run_at(task: Arc<Box<dyn ScheduledTask>>, cancel: CancellationToken) {
-        if let Create::At(time, skip) = task.get_schedule() {
+        if let Task::At(time, skip) = task.get_schedule() {
             tokio::spawn(async move {
                 let now = if let Some(now) = get_now() {
                     now
@@ -312,7 +312,7 @@ impl Scheduler {
     /// run once task
     #[instrument(skip(task, cancel))]
     async fn run_once(task: Arc<Box<dyn ScheduledTask>>, cancel: CancellationToken) {
-        if let Create::Once(next) = task.get_schedule() {
+        if let Task::Once(next) = task.get_schedule() {
             tokio::spawn(async move {
                 if let Some(now) = get_now() {
                     if next < now {

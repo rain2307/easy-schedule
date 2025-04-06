@@ -33,7 +33,7 @@ easy-schedule = "0.1"
 ## Usage Example
 
 ```rust
-use easy_schedule::{Scheduler, Create, Skip};
+use easy_schedule::{Scheduler, Task, Skip};
 use std::sync::Arc;
 use time::Time;
 
@@ -41,8 +41,8 @@ use time::Time;
 struct MyTask;
 
 impl ScheduledTask for MyTask {
-    fn get_schedule(&self) -> Create {
-        Create::At(Time::try_from_hms(12, 0, 0).unwrap(), None)
+    fn get_schedule(&self) -> Task {
+        Task::At(Time::try_from_hms(12, 0, 0).unwrap(), None)
     }
 
     fn on_time(&self) {
