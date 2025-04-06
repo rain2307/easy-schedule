@@ -114,7 +114,7 @@ impl fmt::Display for Task {
 }
 
 /// a task that can be scheduled
-pub trait ScheduledTask: Debug + Sync + Send {
+pub trait ScheduledTask: Sync + Send {
     /// get the schedule type
     fn get_schedule(&self) -> Task;
 
