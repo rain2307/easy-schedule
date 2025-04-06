@@ -1,4 +1,4 @@
-use crossbeam_deque::Worker;
+use crossbeam_deque::{Injector, Steal};
 use std::{
     boxed::Box,
     fmt::{self, Debug},
@@ -126,14 +126,14 @@ pub trait ScheduledTask: Debug + Sync + Send {
 }
 
 pub struct Scheduler {
-    tasks: Worker<Arc<Box<dyn ScheduledTask>>>,
+    tasks: Injector<Arc<Box<dyn ScheduledTask>>>,
     cancel: CancellationToken,
 }
 
 impl Scheduler {
     pub fn new() -> Self {
         Self {
-            tasks: Worker::new_fifo(),
+            tasks: Injector::new(),
             cancel: CancellationToken::new(),
         }
     }
@@ -163,22 +163,33 @@ impl Scheduler {
 
     /// 检查当前任务
     async fn check(&self) {
-        while let Some(task) = self.tasks.pop() {
-            let schedule = task.get_schedule();
-            let cancel = self.cancel.clone();
-            let task = task.clone();
-            match schedule {
-                Task::Wait(..) => {
-                    Scheduler::run_wait(task, cancel.clone()).await;
+        loop {
+            let task = self.tasks.steal();
+            match task {
+                Steal::Success(task) => {
+                    let schedule = task.get_schedule();
+                    let cancel = self.cancel.clone();
+                    let task = task.clone();
+                    match schedule {
+                        Task::Wait(..) => {
+                            Scheduler::run_wait(task, cancel.clone()).await;
+                        }
+                        Task::Interval(..) => {
+                            Scheduler::run_interval(task, cancel.clone()).await;
+                        }
+                        Task::At(..) => {
+                            Scheduler::run_at(task, cancel.clone()).await;
+                        }
+                        Task::Once(..) => {
+                            Scheduler::run_once(task, cancel.clone()).await;
+                        }
+                    }
                 }
-                Task::Interval(..) => {
-                    Scheduler::run_interval(task, cancel.clone()).await;
+                Steal::Retry => {
+                    break;
                 }
-                Task::At(..) => {
-                    Scheduler::run_at(task, cancel.clone()).await;
-                }
-                Task::Once(..) => {
-                    Scheduler::run_once(task, cancel.clone()).await;
+                Steal::Empty => {
+                    break;
                 }
             }
         }
