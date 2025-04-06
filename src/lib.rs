@@ -9,7 +9,7 @@ use tokio::{
     select,
     time::{Duration, Instant, sleep, sleep_until},
 };
-use tokio_util::sync::CancellationToken;
+pub use tokio_util::sync::CancellationToken;
 use tracing::{error, instrument};
 
 #[derive(Debug, Clone)]
@@ -119,10 +119,10 @@ pub trait ScheduledTask: Debug + Sync + Send {
     fn get_schedule(&self) -> Task;
 
     /// called when the task is scheduled
-    fn on_time(&self);
+    fn on_time(&self, cancel: CancellationToken);
 
     /// called when the task is skipped
-    fn on_skip(&self);
+    fn on_skip(&self, cancel: CancellationToken);
 }
 
 pub struct Scheduler {
@@ -227,12 +227,11 @@ impl Scheduler {
                 if let Some(now) = get_now() {
                     if let Some(skip) = skip {
                         if skip.is_skip(now) {
-                            task.on_skip();
+                            task.on_skip(cancel.clone());
                             return;
                         }
-
-                        task.on_time();
                     }
+                    task.on_time(cancel.clone());
                 }
             });
         }
@@ -255,11 +254,11 @@ impl Scheduler {
                     if let Some(now) = get_now() {
                         if let Some(ref skip) = skip {
                             if skip.is_skip(now) {
-                                task.on_skip();
+                                task.on_skip(cancel.clone());
                                 continue;
                             }
-                            task.on_time();
                         }
+                        task.on_time(cancel.clone());
                     }
                 }
             });
@@ -296,12 +295,12 @@ impl Scheduler {
 
                     if let Some(skip) = skip.clone() {
                         if skip.is_skip(now) {
-                            task.on_skip();
+                            task.on_skip(cancel.clone());
                             return;
                         }
                     }
 
-                    task.on_time();
+                    task.on_time(cancel.clone());
 
                     next += time::Duration::days(1);
                 }
@@ -316,7 +315,7 @@ impl Scheduler {
             tokio::spawn(async move {
                 if let Some(now) = get_now() {
                     if next < now {
-                        task.on_skip();
+                        task.on_skip(cancel.clone());
                         return;
                     }
                     let seconds = (next - now).as_seconds_f64() as u64;
@@ -330,7 +329,7 @@ impl Scheduler {
                             tracing::debug!("once time");
                         }
                     }
-                    task.on_time();
+                    task.on_time(cancel.clone());
                 }
             });
         }
