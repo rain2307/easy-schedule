@@ -21,7 +21,7 @@ pub enum Skip {
     /// skip days
     ///
     /// 1: Monday, 2: Tuesday, 3: Wednesday, 4: Thursday, 5: Friday, 6: Saturday, 7: Sunday
-    Day(usize),
+    Day(Vec<u8>),
     /// skip days range
     ///
     /// 1: Monday, 2: Tuesday, 3: Wednesday, 4: Thursday, 5: Friday, 6: Saturday, 7: Sunday
@@ -47,7 +47,7 @@ impl fmt::Display for Skip {
         match self {
             Skip::Date(date) => write!(f, "date: {}", date),
             Skip::DateRange(start, end) => write!(f, "date range: {} - {}", start, end),
-            Skip::Day(day) => write!(f, "day: {}", day),
+            Skip::Day(day) => write!(f, "day: {:?}", day),
             Skip::DayRange(start, end) => write!(f, "day range: {} - {}", start, end),
             Skip::Time(time) => write!(f, "time: {}", time),
             Skip::TimeRange(start, end) => write!(f, "time range: {} - {}", start, end),
@@ -62,7 +62,7 @@ impl Skip {
         match self {
             Skip::Date(date) => time.date() == *date,
             Skip::DateRange(start, end) => time.date() >= *start && time.date() <= *end,
-            Skip::Day(day) => time.day() + 1 == *day as u8,
+            Skip::Day(day) => day.contains(&(time.day() + 1)),
             Skip::DayRange(start, end) => {
                 time.day() + 1 >= *start as u8 && time.day() + 1 <= *end as u8
             }
