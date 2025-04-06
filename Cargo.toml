@@ -1,0 +1,20 @@
+[package]
+name = "easy-schedule"
+version = "0.1.0"
+edition = "2024"
+description = "A flexible task scheduler built on Tokio with multiple scheduling options and skip conditions"
+keywords = ["tokio", "scheduler", "task", "async"]
+categories = ["asynchronous", "scheduling"]
+authors = ["rain2307 snow20250406@proton.me"]
+repository = "https://github.com/yourusername/easy-schedule"
+license = "MIT"
+
+[dependencies]
+crossbeam-deque = "0.8.6"
+time = { version = "0.3.41", features = ["local-offset", "macros"] }
+tokio = { version = "1.44.2", features = ["full"] }
+tokio-util = "0.7.14"
+tracing = "0.1.41"
+
+[dev-dependencies]
+tracing-subscriber = "0.3.19"
