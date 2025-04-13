@@ -14,11 +14,11 @@ impl ScheduledTask for WaitTask {
     }
 
     fn on_time(&self, _cancel: CancellationToken) {
-        println!("WaitTask");
+        print_time("WaitTask on_time");
     }
 
     fn on_skip(&self, _cancel: CancellationToken) {
-        println!("WaitTask on_skip");
+        print_time("WaitTask on_skip");
     }
 }
 
@@ -47,11 +47,11 @@ impl ScheduledTask for IntervalTask {
             println!("IntervalTask cancel");
             _cancel.cancel();
         }
-        println!("IntervalTask  {}", n);
+        print_time(&format!("IntervalTask {}", n));
     }
 
     fn on_skip(&self, _cancel: CancellationToken) {
-        println!("IntervalTask on_skip");
+        print_time("IntervalTask on_skip");
     }
 }
 
@@ -66,11 +66,11 @@ impl ScheduledTask for AtTask {
     }
 
     fn on_time(&self, _cancel: CancellationToken) {
-        println!("AtTask Execute");
+        print_time("AtTask Execute");
     }
 
     fn on_skip(&self, _cancel: CancellationToken) {
-        println!("AtTask on_skip");
+        print_time("AtTask on_skip");
     }
 }
 
@@ -85,12 +85,16 @@ impl ScheduledTask for OnceTask {
     }
 
     fn on_time(&self, _cancel: CancellationToken) {
-        println!("OnceTask Execute");
+        print_time("OnceTask Execute");
     }
 
     fn on_skip(&self, _cancel: CancellationToken) {
-        println!("OnceTask on_skip");
+        print_time("OnceTask on_skip");
     }
+}
+
+fn print_time(key: &str) {
+    println!("{}", key);
 }
 
 #[tokio::main]
@@ -98,13 +102,11 @@ async fn main() {
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
         .init();
-    let scheduler = Scheduler::new();
 
-    scheduler.add_task(Arc::new(Box::new(WaitTask))).await;
-    scheduler
-        .add_task(Arc::new(Box::new(IntervalTask::new())))
-        .await;
-    scheduler.add_task(Arc::new(Box::new(AtTask))).await;
-    scheduler.add_task(Arc::new(Box::new(OnceTask))).await;
-    scheduler.start().await;
+    Scheduler::start(WaitTask).await;
+    Scheduler::start(IntervalTask::new()).await;
+    Scheduler::start(AtTask).await;
+    Scheduler::start(OnceTask).await;
+
+    tokio::signal::ctrl_c().await.unwrap();
 }

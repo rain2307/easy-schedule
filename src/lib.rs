@@ -1,9 +1,4 @@
-use crossbeam_deque::{Injector, Steal};
-use std::{
-    boxed::Box,
-    fmt::{self, Debug},
-    sync::Arc,
-};
+use std::fmt::{self, Debug};
 use time::{Date, OffsetDateTime, Time};
 use tokio::{
     select,
@@ -82,11 +77,11 @@ impl Skip {
 #[derive(Debug, Clone)]
 pub enum Task {
     /// wait seconds
-    Wait(u64, Option<Skip>),
+    Wait(u64, Option<Vec<Skip>>),
     /// interval seconds
-    Interval(u64, Option<Skip>),
+    Interval(u64, Option<Vec<Skip>>),
     /// at time
-    At(Time, Option<Skip>),
+    At(Time, Option<Vec<Skip>>),
     /// exact time
     Once(OffsetDateTime),
 }
@@ -95,18 +90,34 @@ impl fmt::Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Task::Wait(wait, skip) => {
-                write!(f, "wait: {} {}", wait, skip.clone().unwrap_or_default())
+                let skip = skip
+                    .clone()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                write!(f, "wait: {} {}", wait, skip)
             }
             Task::Interval(interval, skip) => {
-                write!(
-                    f,
-                    "interval: {} {}",
-                    interval,
-                    skip.clone().unwrap_or_default()
-                )
+                let skip = skip
+                    .clone()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                write!(f, "interval: {} {}", interval, skip)
             }
             Task::At(time, skip) => {
-                write!(f, "at: {} {}", time, skip.clone().unwrap_or_default())
+                let skip = skip
+                    .clone()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                write!(f, "at: {} {}", time, skip)
             }
             Task::Once(time) => write!(f, "once: {}", time),
         }
@@ -126,73 +137,30 @@ pub trait ScheduledTask: Sync + Send {
 }
 
 pub struct Scheduler {
-    tasks: Injector<Arc<Box<dyn ScheduledTask>>>,
     cancel: CancellationToken,
 }
 
 impl Scheduler {
-    pub fn new() -> Self {
-        Self {
-            tasks: Injector::new(),
-            cancel: CancellationToken::new(),
-        }
-    }
-
     /// start the scheduler
-    pub async fn start(&self) {
-        self.check().await;
-
-        let cancel = self.cancel.clone();
-        select! {
-            _ = cancel.cancelled() => {
-                tracing::debug!("scheduler cancelled");
+    pub async fn start<T: ScheduledTask + 'static>(task: T) -> CancellationToken {
+        let schedule = task.get_schedule();
+        let cancel = CancellationToken::new();
+        match schedule {
+            Task::Wait(..) => {
+                Scheduler::run_wait(task, cancel.clone()).await;
             }
-            _ = tokio::signal::ctrl_c() => {
-                tracing::debug!("ctrl+c");
-                if !cancel.is_cancelled() {
-                    cancel.cancel();
-                }
+            Task::Interval(..) => {
+                Scheduler::run_interval(task, cancel.clone()).await;
             }
-        }
-    }
-
-    pub async fn add_task(&self, task: Arc<Box<dyn ScheduledTask>>) {
-        self.tasks.push(task);
-        self.check().await;
-    }
-
-    /// 检查当前任务
-    async fn check(&self) {
-        loop {
-            let task = self.tasks.steal();
-            match task {
-                Steal::Success(task) => {
-                    let schedule = task.get_schedule();
-                    let cancel = self.cancel.clone();
-                    let task = task.clone();
-                    match schedule {
-                        Task::Wait(..) => {
-                            Scheduler::run_wait(task, cancel.clone()).await;
-                        }
-                        Task::Interval(..) => {
-                            Scheduler::run_interval(task, cancel.clone()).await;
-                        }
-                        Task::At(..) => {
-                            Scheduler::run_at(task, cancel.clone()).await;
-                        }
-                        Task::Once(..) => {
-                            Scheduler::run_once(task, cancel.clone()).await;
-                        }
-                    }
-                }
-                Steal::Retry => {
-                    break;
-                }
-                Steal::Empty => {
-                    break;
-                }
+            Task::At(..) => {
+                Scheduler::run_at(task, cancel.clone()).await;
+            }
+            Task::Once(..) => {
+                Scheduler::run_once(task, cancel.clone()).await;
             }
         }
+
+        cancel
     }
 
     /// stop the scheduler
@@ -224,7 +192,7 @@ fn get_now() -> Option<OffsetDateTime> {
 impl Scheduler {
     /// run wait task
     #[instrument(skip(task, cancel))]
-    async fn run_wait(task: Arc<Box<dyn ScheduledTask>>, cancel: CancellationToken) {
+    async fn run_wait<T: ScheduledTask + 'static>(task: T, cancel: CancellationToken) {
         if let Task::Wait(wait, skip) = task.get_schedule() {
             tokio::spawn(async move {
                 select! {
@@ -237,7 +205,7 @@ impl Scheduler {
                 };
                 if let Some(now) = get_now() {
                     if let Some(skip) = skip {
-                        if skip.is_skip(now) {
+                        if skip.iter().any(|s| s.is_skip(now)) {
                             task.on_skip(cancel.clone());
                             return;
                         }
@@ -250,7 +218,7 @@ impl Scheduler {
 
     /// run interval task
     #[instrument(skip(task, cancel))]
-    async fn run_interval(task: Arc<Box<dyn ScheduledTask>>, cancel: CancellationToken) {
+    async fn run_interval<T: ScheduledTask + 'static>(task: T, cancel: CancellationToken) {
         if let Task::Interval(interval, skip) = task.get_schedule() {
             tokio::spawn(async move {
                 loop {
@@ -264,7 +232,7 @@ impl Scheduler {
                     };
                     if let Some(now) = get_now() {
                         if let Some(ref skip) = skip {
-                            if skip.is_skip(now) {
+                            if skip.iter().any(|s| s.is_skip(now)) {
                                 task.on_skip(cancel.clone());
                                 continue;
                             }
@@ -278,7 +246,7 @@ impl Scheduler {
 
     /// run at task
     #[instrument(skip(task, cancel))]
-    async fn run_at(task: Arc<Box<dyn ScheduledTask>>, cancel: CancellationToken) {
+    async fn run_at<T: ScheduledTask + 'static>(task: T, cancel: CancellationToken) {
         if let Task::At(time, skip) = task.get_schedule() {
             tokio::spawn(async move {
                 let now = if let Some(now) = get_now() {
@@ -305,7 +273,7 @@ impl Scheduler {
                     }
 
                     if let Some(skip) = skip.clone() {
-                        if skip.is_skip(now) {
+                        if skip.iter().any(|s| s.is_skip(now)) {
                             task.on_skip(cancel.clone());
                             return;
                         }
@@ -321,7 +289,7 @@ impl Scheduler {
 
     /// run once task
     #[instrument(skip(task, cancel))]
-    async fn run_once(task: Arc<Box<dyn ScheduledTask>>, cancel: CancellationToken) {
+    async fn run_once<T: ScheduledTask + 'static>(task: T, cancel: CancellationToken) {
         if let Task::Once(next) = task.get_schedule() {
             tokio::spawn(async move {
                 if let Some(now) = get_now() {

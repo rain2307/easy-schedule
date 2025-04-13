@@ -1,6 +1,6 @@
 [package]
 name = "easy-schedule"
-version = "0.2.2"
+version = "0.3.0"
 edition = "2024"
 description = "A flexible task scheduler built on Tokio with multiple scheduling options and skip conditions"
 keywords = ["tokio", "scheduler", "task", "async"]

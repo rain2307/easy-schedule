@@ -1,8 +1,5 @@
-use std::sync::Arc;
-
 #[allow(unused_imports)]
 use easy_schedule::{CancellationToken, ScheduledTask, Scheduler, Task};
-use tokio::spawn;
 
 #[derive(Debug, Clone)]
 struct WaitTask;
@@ -13,7 +10,7 @@ impl ScheduledTask for WaitTask {
     }
 
     fn on_time(&self, cancel: CancellationToken) {
-        println!("WaitTask");
+        println!("on_time {}", time::OffsetDateTime::now_local().unwrap());
         cancel.cancel();
     }
 
@@ -24,11 +21,16 @@ impl ScheduledTask for WaitTask {
 
 #[tokio::main]
 async fn main() {
-    spawn(async move {
-        let scheduler = Scheduler::new();
-        scheduler.add_task(Arc::new(Box::new(WaitTask))).await;
-        scheduler.start().await;
+    println!("start {}", time::OffsetDateTime::now_local().unwrap());
+    let cancel = Scheduler::start(WaitTask).await;
+
+    tokio::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        cancel.cancel();
+        println!("cancel {}", time::OffsetDateTime::now_local().unwrap());
     })
     .await
     .unwrap();
+
+    tokio::signal::ctrl_c().await.unwrap();
 }
