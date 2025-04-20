@@ -1,23 +1,24 @@
-use std::sync::Arc;
-
+use async_trait::async_trait;
 #[allow(unused_imports)]
 use easy_schedule::{CancellationToken, ScheduledTask, Scheduler, Skip, Task};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use time::OffsetDateTime;
 
 #[derive(Debug, Clone)]
 struct WaitTask;
 
+#[async_trait]
 impl ScheduledTask for WaitTask {
     fn get_schedule(&self) -> Task {
         Task::Wait(3, None)
     }
 
-    fn on_time(&self, _cancel: CancellationToken) {
+    async fn on_time(&self, _cancel: CancellationToken) {
         print_time("WaitTask on_time");
     }
 
-    fn on_skip(&self, _cancel: CancellationToken) {
+    async fn on_skip(&self, _cancel: CancellationToken) {
         print_time("WaitTask on_skip");
     }
 }
@@ -35,13 +36,14 @@ impl IntervalTask {
     }
 }
 
+#[async_trait]
 impl ScheduledTask for IntervalTask {
     fn get_schedule(&self) -> Task {
         Task::Interval(3, None)
         // Task::Interval(10, Some(Skip::Day(7)))
     }
 
-    fn on_time(&self, _cancel: CancellationToken) {
+    async fn on_time(&self, _cancel: CancellationToken) {
         let n = self.count.fetch_add(1, Ordering::Relaxed);
         if n > 10 {
             println!("IntervalTask cancel");
@@ -50,7 +52,7 @@ impl ScheduledTask for IntervalTask {
         print_time(&format!("IntervalTask {}", n));
     }
 
-    fn on_skip(&self, _cancel: CancellationToken) {
+    async fn on_skip(&self, _cancel: CancellationToken) {
         print_time("IntervalTask on_skip");
     }
 }
@@ -58,6 +60,7 @@ impl ScheduledTask for IntervalTask {
 #[derive(Debug, Clone)]
 struct AtTask;
 
+#[async_trait]
 impl ScheduledTask for AtTask {
     fn get_schedule(&self) -> Task {
         let now = OffsetDateTime::now_local().unwrap();
@@ -65,11 +68,11 @@ impl ScheduledTask for AtTask {
         Task::At(next.time(), None)
     }
 
-    fn on_time(&self, _cancel: CancellationToken) {
+    async fn on_time(&self, _cancel: CancellationToken) {
         print_time("AtTask Execute");
     }
 
-    fn on_skip(&self, _cancel: CancellationToken) {
+    async fn on_skip(&self, _cancel: CancellationToken) {
         print_time("AtTask on_skip");
     }
 }
@@ -77,6 +80,7 @@ impl ScheduledTask for AtTask {
 #[derive(Debug, Clone)]
 struct OnceTask;
 
+#[async_trait]
 impl ScheduledTask for OnceTask {
     fn get_schedule(&self) -> Task {
         let now = OffsetDateTime::now_local().unwrap();
@@ -84,11 +88,11 @@ impl ScheduledTask for OnceTask {
         Task::Once(next)
     }
 
-    fn on_time(&self, _cancel: CancellationToken) {
+    async fn on_time(&self, _cancel: CancellationToken) {
         print_time("OnceTask Execute");
     }
 
-    fn on_skip(&self, _cancel: CancellationToken) {
+    async fn on_skip(&self, _cancel: CancellationToken) {
         print_time("OnceTask on_skip");
     }
 }

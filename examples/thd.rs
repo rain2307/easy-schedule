@@ -1,20 +1,22 @@
+use async_trait::async_trait;
 #[allow(unused_imports)]
 use easy_schedule::{CancellationToken, ScheduledTask, Scheduler, Task};
 
 #[derive(Debug, Clone)]
 struct WaitTask;
 
+#[async_trait]
 impl ScheduledTask for WaitTask {
     fn get_schedule(&self) -> Task {
         Task::Wait(3, None)
     }
 
-    fn on_time(&self, cancel: CancellationToken) {
+    async fn on_time(&self, cancel: CancellationToken) {
         println!("on_time {}", time::OffsetDateTime::now_local().unwrap());
         cancel.cancel();
     }
 
-    fn on_skip(&self, _cancel: CancellationToken) {
+    async fn on_skip(&self, _cancel: CancellationToken) {
         println!("WaitTask on_skip");
     }
 }

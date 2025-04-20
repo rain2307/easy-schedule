@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use std::fmt::{self, Debug};
 use time::{Date, OffsetDateTime, Time};
 use tokio::{
@@ -125,15 +126,16 @@ impl fmt::Display for Task {
 }
 
 /// a task that can be scheduled
+#[async_trait]
 pub trait ScheduledTask: Sync + Send {
     /// get the schedule type
     fn get_schedule(&self) -> Task;
 
     /// called when the task is scheduled
-    fn on_time(&self, cancel: CancellationToken);
+    async fn on_time(&self, cancel: CancellationToken);
 
     /// called when the task is skipped
-    fn on_skip(&self, cancel: CancellationToken);
+    async fn on_skip(&self, cancel: CancellationToken);
 }
 
 pub struct Scheduler {
@@ -194,7 +196,8 @@ impl Scheduler {
     #[instrument(skip(task, cancel))]
     async fn run_wait<T: ScheduledTask + 'static>(task: T, cancel: CancellationToken) {
         if let Task::Wait(wait, skip) = task.get_schedule() {
-            tokio::spawn(async move {
+            let task_ref = task;
+            tokio::task::spawn(async move {
                 select! {
                     _ = cancel.cancelled() => {
                         return;
@@ -206,11 +209,11 @@ impl Scheduler {
                 if let Some(now) = get_now() {
                     if let Some(skip) = skip {
                         if skip.iter().any(|s| s.is_skip(now)) {
-                            task.on_skip(cancel.clone());
+                            task_ref.on_skip(cancel.clone()).await;
                             return;
                         }
                     }
-                    task.on_time(cancel.clone());
+                    task_ref.on_time(cancel.clone()).await;
                 }
             });
         }
@@ -220,7 +223,8 @@ impl Scheduler {
     #[instrument(skip(task, cancel))]
     async fn run_interval<T: ScheduledTask + 'static>(task: T, cancel: CancellationToken) {
         if let Task::Interval(interval, skip) = task.get_schedule() {
-            tokio::spawn(async move {
+            let task_ref = task;
+            tokio::task::spawn(async move {
                 loop {
                     select! {
                         _ = cancel.cancelled() => {
@@ -233,11 +237,11 @@ impl Scheduler {
                     if let Some(now) = get_now() {
                         if let Some(ref skip) = skip {
                             if skip.iter().any(|s| s.is_skip(now)) {
-                                task.on_skip(cancel.clone());
+                                task_ref.on_skip(cancel.clone()).await;
                                 continue;
                             }
                         }
-                        task.on_time(cancel.clone());
+                        task_ref.on_time(cancel.clone()).await;
                     }
                 }
             });
@@ -248,7 +252,8 @@ impl Scheduler {
     #[instrument(skip(task, cancel))]
     async fn run_at<T: ScheduledTask + 'static>(task: T, cancel: CancellationToken) {
         if let Task::At(time, skip) = task.get_schedule() {
-            tokio::spawn(async move {
+            let task_ref = task;
+            tokio::task::spawn(async move {
                 let now = if let Some(now) = get_now() {
                     now
                 } else {
@@ -274,12 +279,12 @@ impl Scheduler {
 
                     if let Some(skip) = skip.clone() {
                         if skip.iter().any(|s| s.is_skip(now)) {
-                            task.on_skip(cancel.clone());
+                            task_ref.on_skip(cancel.clone()).await;
                             return;
                         }
                     }
 
-                    task.on_time(cancel.clone());
+                    task_ref.on_time(cancel.clone()).await;
 
                     next += time::Duration::days(1);
                 }
@@ -291,10 +296,11 @@ impl Scheduler {
     #[instrument(skip(task, cancel))]
     async fn run_once<T: ScheduledTask + 'static>(task: T, cancel: CancellationToken) {
         if let Task::Once(next) = task.get_schedule() {
-            tokio::spawn(async move {
+            let task_ref = task;
+            tokio::task::spawn(async move {
                 if let Some(now) = get_now() {
                     if next < now {
-                        task.on_skip(cancel.clone());
+                        task_ref.on_skip(cancel.clone()).await;
                         return;
                     }
                     let seconds = (next - now).as_seconds_f64() as u64;
@@ -308,7 +314,7 @@ impl Scheduler {
                             tracing::debug!("once time");
                         }
                     }
-                    task.on_time(cancel.clone());
+                    task_ref.on_time(cancel.clone()).await;
                 }
             });
         }
