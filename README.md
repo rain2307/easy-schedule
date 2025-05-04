@@ -2,6 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/easy-schedule)](https://crates.io/crates/easy-schedule)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](LICENSE)
+[![CI](https://github.com/rain2307/easy-schedule/actions/workflows/rust.yml/badge.svg)](https://github.com/rain2307/easy-schedule/actions/workflows/rust.yml)
 
 A flexible task scheduler built on Tokio with multiple scheduling options and skip conditions.
 
