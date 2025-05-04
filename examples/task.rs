@@ -106,13 +106,10 @@ async fn main() {
         .init();
 
     let scheduler = Scheduler::new();
-    scheduler.start(WaitTask).await;
-    let scheduler = Scheduler::new();
-    scheduler.start(IntervalTask::new()).await;
-    let scheduler = Scheduler::new();
-    scheduler.start(AtTask).await;
-    let scheduler = Scheduler::new();
-    scheduler.start(OnceTask).await;
+    scheduler.run(WaitTask).await;
+    scheduler.run(IntervalTask::new()).await;
+    scheduler.run(AtTask).await;
+    scheduler.run(OnceTask).await;
 
     tokio::signal::ctrl_c().await.unwrap();
 }

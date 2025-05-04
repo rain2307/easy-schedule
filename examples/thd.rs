@@ -24,7 +24,7 @@ impl Notifiable for WaitTask {
 async fn main() {
     println!("start {}", time::OffsetDateTime::now_local().unwrap());
     let scheduler = Scheduler::new();
-    scheduler.start(WaitTask).await;
+    scheduler.run(WaitTask).await;
 
     tokio::spawn(async move {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;

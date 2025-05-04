@@ -58,7 +58,7 @@ impl Notifiable for WaitTask {
 #[tokio::main]
 async fn main() {
     let scheduler = Scheduler::new();
-    scheduler.start(WaitTask).await;
+    scheduler.run(WaitTask).await;
 }
 
 ```

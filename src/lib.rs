@@ -156,8 +156,8 @@ impl Scheduler {
         }
     }
 
-    /// start the scheduler
-    pub async fn start<T: Notifiable + 'static>(&self, task: T) {
+    /// run the task
+    pub async fn run<T: Notifiable + 'static>(&self, task: T) {
         let schedule = task.get_schedule();
         let cancel = self.cancel.clone();
 
