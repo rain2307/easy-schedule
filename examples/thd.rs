@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use easy_schedule::{CancellationToken, Notifiable, Scheduler, Task};
+use easy_schedule::prelude::*;
 
 #[derive(Debug, Clone)]
 struct WaitTask;

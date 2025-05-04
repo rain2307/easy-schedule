@@ -1,5 +1,4 @@
-use async_trait::async_trait;
-use easy_schedule::{CancellationToken, Notifiable, Scheduler, Task};
+use easy_schedule::prelude::*;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use time::OffsetDateTime;
