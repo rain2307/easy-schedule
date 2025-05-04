@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-#[allow(unused_imports)]
 use easy_schedule::{CancellationToken, ScheduledTask, Scheduler, Task};
 
 #[derive(Debug, Clone)]
@@ -24,15 +23,14 @@ impl ScheduledTask for WaitTask {
 #[tokio::main]
 async fn main() {
     println!("start {}", time::OffsetDateTime::now_local().unwrap());
-    let cancel = Scheduler::start(WaitTask).await;
+    let scheduler = Scheduler::new();
+    scheduler.start(WaitTask).await;
 
     tokio::spawn(async move {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        cancel.cancel();
+        scheduler.stop();
         println!("cancel {}", time::OffsetDateTime::now_local().unwrap());
     })
     .await
     .unwrap();
-
-    tokio::signal::ctrl_c().await.unwrap();
 }

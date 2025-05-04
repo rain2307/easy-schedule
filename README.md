@@ -33,33 +33,33 @@ easy-schedule = "0.1"
 ## Usage Example
 
 ```rust
-use easy_schedule::{Scheduler, Task, Skip};
-use std::sync::Arc;
-use time::Time;
+use async_trait::async_trait;
+use easy_schedule::{CancellationToken, ScheduledTask, Scheduler, Task};
 
-#[derive(Debug)]
-struct MyTask;
+#[derive(Debug, Clone)]
+struct WaitTask;
 
-impl ScheduledTask for MyTask {
+#[async_trait]
+impl ScheduledTask for WaitTask {
     fn get_schedule(&self) -> Task {
-        Task::At(Time::try_from_hms(12, 0, 0).unwrap(), None)
+        Task::Wait(3, None)
     }
 
-    fn on_time(&self) {
-        println!("Task executed at noon");
+    async fn on_time(&self, cancel: CancellationToken) {
+        // ...
     }
 
-    fn on_skip(&self) {
-        println!("Task skipped");
+    async fn on_skip(&self, _cancel: CancellationToken) {
+        // ...
     }
 }
 
 #[tokio::main]
 async fn main() {
     let scheduler = Scheduler::new();
-    scheduler.add_task(Arc::new(Box::new(MyTask))).await;
-    scheduler.start().await;
+    scheduler.start(WaitTask).await;
 }
+
 ```
 
 ## License

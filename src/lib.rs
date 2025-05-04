@@ -143,10 +143,18 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
+    /// create a new scheduler
+    pub fn new() -> Self {
+        Self {
+            cancel: CancellationToken::new(),
+        }
+    }
+
     /// start the scheduler
-    pub async fn start<T: ScheduledTask + 'static>(task: T) -> CancellationToken {
+    pub async fn start<T: ScheduledTask + 'static>(&self, task: T) {
         let schedule = task.get_schedule();
-        let cancel = CancellationToken::new();
+        let cancel = self.cancel.clone();
+
         match schedule {
             Task::Wait(..) => {
                 Scheduler::run_wait(task, cancel.clone()).await;
@@ -161,8 +169,6 @@ impl Scheduler {
                 Scheduler::run_once(task, cancel.clone()).await;
             }
         }
-
-        cancel
     }
 
     /// stop the scheduler
@@ -170,6 +176,11 @@ impl Scheduler {
     /// this will cancel all the tasks
     pub fn stop(&self) {
         self.cancel.cancel();
+    }
+
+    /// get the cancel token
+    pub fn get_cancel(&self) -> CancellationToken {
+        self.cancel.clone()
     }
 }
 

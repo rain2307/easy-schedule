@@ -1,6 +1,5 @@
 use async_trait::async_trait;
-#[allow(unused_imports)]
-use easy_schedule::{CancellationToken, ScheduledTask, Scheduler, Skip, Task};
+use easy_schedule::{CancellationToken, ScheduledTask, Scheduler, Task};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use time::OffsetDateTime;
@@ -107,10 +106,14 @@ async fn main() {
         .with_max_level(tracing::Level::DEBUG)
         .init();
 
-    Scheduler::start(WaitTask).await;
-    Scheduler::start(IntervalTask::new()).await;
-    Scheduler::start(AtTask).await;
-    Scheduler::start(OnceTask).await;
+    let scheduler = Scheduler::new();
+    scheduler.start(WaitTask).await;
+    let scheduler = Scheduler::new();
+    scheduler.start(IntervalTask::new()).await;
+    let scheduler = Scheduler::new();
+    scheduler.start(AtTask).await;
+    let scheduler = Scheduler::new();
+    scheduler.start(OnceTask).await;
 
     tokio::signal::ctrl_c().await.unwrap();
 }
