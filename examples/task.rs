@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use easy_schedule::{CancellationToken, ScheduledTask, Scheduler, Task};
+use easy_schedule::{CancellationToken, Notifiable, Scheduler, Task};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use time::OffsetDateTime;
@@ -8,7 +8,7 @@ use time::OffsetDateTime;
 struct WaitTask;
 
 #[async_trait]
-impl ScheduledTask for WaitTask {
+impl Notifiable for WaitTask {
     fn get_schedule(&self) -> Task {
         Task::Wait(3, None)
     }
@@ -36,7 +36,7 @@ impl IntervalTask {
 }
 
 #[async_trait]
-impl ScheduledTask for IntervalTask {
+impl Notifiable for IntervalTask {
     fn get_schedule(&self) -> Task {
         Task::Interval(3, None)
         // Task::Interval(10, Some(Skip::Day(7)))
@@ -60,7 +60,7 @@ impl ScheduledTask for IntervalTask {
 struct AtTask;
 
 #[async_trait]
-impl ScheduledTask for AtTask {
+impl Notifiable for AtTask {
     fn get_schedule(&self) -> Task {
         let now = OffsetDateTime::now_local().unwrap();
         let next = now + time::Duration::seconds(5);
@@ -80,7 +80,7 @@ impl ScheduledTask for AtTask {
 struct OnceTask;
 
 #[async_trait]
-impl ScheduledTask for OnceTask {
+impl Notifiable for OnceTask {
     fn get_schedule(&self) -> Task {
         let now = OffsetDateTime::now_local().unwrap();
         let next = now + time::Duration::seconds(10);

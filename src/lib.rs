@@ -127,7 +127,7 @@ impl fmt::Display for Task {
 
 /// a task that can be scheduled
 #[async_trait]
-pub trait ScheduledTask: Sync + Send {
+pub trait Notifiable: Sync + Send {
     /// get the schedule type
     fn get_schedule(&self) -> Task;
 
@@ -151,7 +151,7 @@ impl Scheduler {
     }
 
     /// start the scheduler
-    pub async fn start<T: ScheduledTask + 'static>(&self, task: T) {
+    pub async fn start<T: Notifiable + 'static>(&self, task: T) {
         let schedule = task.get_schedule();
         let cancel = self.cancel.clone();
 
@@ -205,7 +205,7 @@ fn get_now() -> Option<OffsetDateTime> {
 impl Scheduler {
     /// run wait task
     #[instrument(skip(task, cancel))]
-    async fn run_wait<T: ScheduledTask + 'static>(task: T, cancel: CancellationToken) {
+    async fn run_wait<T: Notifiable + 'static>(task: T, cancel: CancellationToken) {
         if let Task::Wait(wait, skip) = task.get_schedule() {
             let task_ref = task;
             tokio::task::spawn(async move {
@@ -232,7 +232,7 @@ impl Scheduler {
 
     /// run interval task
     #[instrument(skip(task, cancel))]
-    async fn run_interval<T: ScheduledTask + 'static>(task: T, cancel: CancellationToken) {
+    async fn run_interval<T: Notifiable + 'static>(task: T, cancel: CancellationToken) {
         if let Task::Interval(interval, skip) = task.get_schedule() {
             let task_ref = task;
             tokio::task::spawn(async move {
@@ -261,7 +261,7 @@ impl Scheduler {
 
     /// run at task
     #[instrument(skip(task, cancel))]
-    async fn run_at<T: ScheduledTask + 'static>(task: T, cancel: CancellationToken) {
+    async fn run_at<T: Notifiable + 'static>(task: T, cancel: CancellationToken) {
         if let Task::At(time, skip) = task.get_schedule() {
             let task_ref = task;
             tokio::task::spawn(async move {
@@ -305,7 +305,7 @@ impl Scheduler {
 
     /// run once task
     #[instrument(skip(task, cancel))]
-    async fn run_once<T: ScheduledTask + 'static>(task: T, cancel: CancellationToken) {
+    async fn run_once<T: Notifiable + 'static>(task: T, cancel: CancellationToken) {
         if let Task::Once(next) = task.get_schedule() {
             let task_ref = task;
             tokio::task::spawn(async move {

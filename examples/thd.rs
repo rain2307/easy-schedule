@@ -1,11 +1,11 @@
 use async_trait::async_trait;
-use easy_schedule::{CancellationToken, ScheduledTask, Scheduler, Task};
+use easy_schedule::{CancellationToken, Notifiable, Scheduler, Task};
 
 #[derive(Debug, Clone)]
 struct WaitTask;
 
 #[async_trait]
-impl ScheduledTask for WaitTask {
+impl Notifiable for WaitTask {
     fn get_schedule(&self) -> Task {
         Task::Wait(3, None)
     }
