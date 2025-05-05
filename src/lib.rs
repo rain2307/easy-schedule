@@ -138,10 +138,16 @@ pub trait Notifiable: Sync + Send {
     fn get_schedule(&self) -> Task;
 
     /// called when the task is scheduled
-    async fn on_time(&self, cancel: CancellationToken);
+    ///
+    /// Default cancel on first trigger
+    async fn on_time(&self, cancel: CancellationToken) {
+        cancel.cancel();
+    }
 
     /// called when the task is skipped
-    async fn on_skip(&self, cancel: CancellationToken);
+    async fn on_skip(&self, _cancel: CancellationToken) {
+        // do nothing
+    }
 }
 
 pub struct Scheduler {
