@@ -138,9 +138,7 @@ impl From<&str> for Task {
                     OffsetDateTime::parse(&value, &format).expect("parse datetime failed");
                 Task::Once(datetime)
             }
-            _ => {
-                panic!("invalid task: {}", task);
-            }
+            _ => Task::Wait(5, None),
         }
     }
 }
