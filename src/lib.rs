@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use std::fmt::{self, Debug};
-use time::{Date, OffsetDateTime, Time};
+use time::{Date, OffsetDateTime, Time, macros::format_description};
 use tokio::{
     select,
     time::{Duration, Instant, sleep, sleep_until},
@@ -91,6 +91,106 @@ pub enum Task {
     At(Time, Option<Vec<Skip>>),
     /// exact time
     Once(OffsetDateTime),
+}
+
+impl PartialEq for Task {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Task::Wait(a, _), Task::Wait(b, _)) => a == b,
+            (Task::Interval(a, _), Task::Interval(b, _)) => a == b,
+            (Task::At(a, _), Task::At(b, _)) => a == b,
+            (Task::Once(a), Task::Once(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl From<&str> for Task {
+    ///
+    /// - wait=10
+    /// - interval=10
+    /// - at=10:00
+    /// - once=2024-01-01 10:00:00
+    fn from(s: &str) -> Self {
+        let parts = s.split("=").collect::<Vec<&str>>();
+        let task = parts[0];
+        let value = parts[1..].join("");
+        match task {
+            "wait" => {
+                let seconds = value.parse::<u64>().unwrap();
+                Task::Wait(seconds, None)
+            }
+            "interval" => {
+                let seconds = value.parse::<u64>().unwrap();
+                Task::Interval(seconds, None)
+            }
+            "at" => {
+                let format = format_description!("[hour]:[minute]");
+                let time = Time::parse(&value, &format).expect("parse time failed");
+                Task::At(time, None)
+            }
+            "once" => {
+                let format = format_description!(
+                    "[year]-[month]-[day] [hour]:[minute]:[second] [offset_hour sign:mandatory]"
+                );
+                println!("value: {}", value);
+                let datetime =
+                    OffsetDateTime::parse(&value, &format).expect("parse datetime failed");
+                Task::Once(datetime)
+            }
+            _ => {
+                panic!("invalid task: {}", task);
+            }
+        }
+    }
+}
+
+impl From<String> for Task {
+    fn from(s: String) -> Self {
+        Self::from(s.as_str())
+    }
+}
+
+impl From<&String> for Task {
+    fn from(s: &String) -> Self {
+        Self::from(s.as_str())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_string() {
+        let task = Task::from("wait=10");
+        assert_eq!(task, Task::Wait(10, None));
+        let task = Task::from("wait=10".to_string());
+        assert_eq!(task, Task::Wait(10, None));
+        let task = Task::from(&"wait=10".to_string());
+        assert_eq!(task, Task::Wait(10, None));
+    }
+
+    #[test]
+    fn test_from_string_interval() {
+        let task = Task::from("interval=10");
+        assert_eq!(task, Task::Interval(10, None));
+    }
+
+    #[test]
+    fn test_from_string_at() {
+        let task = Task::from("at=10:00");
+        assert_eq!(task, Task::At(Time::from_hms(10, 0, 0).unwrap(), None));
+    }
+
+    #[test]
+    fn test_from_string_once() {
+        let task = Task::from("once=2024-01-01 10:00:00 +08");
+        assert_eq!(
+            task,
+            Task::Once(OffsetDateTime::from_unix_timestamp(1704074400).unwrap())
+        );
+    }
 }
 
 impl fmt::Display for Task {
