@@ -7,7 +7,8 @@ struct WaitTask;
 #[async_trait]
 impl Notifiable for WaitTask {
     fn get_schedule(&self) -> Task {
-        Task::Wait(3, None)
+        // Task::Wait(3, None)
+        "at=00:55".into()
     }
 
     // async fn on_time(&self, cancel: CancellationToken) {

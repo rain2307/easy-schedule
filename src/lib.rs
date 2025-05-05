@@ -1,12 +1,15 @@
 use async_trait::async_trait;
 use std::fmt::{self, Debug};
-use time::{Date, OffsetDateTime, Time, macros::format_description};
+use time::{
+    Date, OffsetDateTime, Time,
+    macros::{format_description, offset},
+};
 use tokio::{
     select,
     time::{Duration, Instant, sleep, sleep_until},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{error, instrument};
+use tracing::instrument;
 
 pub mod prelude {
     pub use super::{Notifiable, Scheduler, Skip, Task};
@@ -133,7 +136,6 @@ impl From<&str> for Task {
                 let format = format_description!(
                     "[year]-[month]-[day] [hour]:[minute]:[second] [offset_hour sign:mandatory]"
                 );
-                println!("value: {}", value);
                 let datetime =
                     OffsetDateTime::parse(&value, &format).expect("parse datetime failed");
                 Task::Once(datetime)
@@ -231,7 +233,7 @@ impl fmt::Display for Task {
 
 /// a task that can be scheduled
 #[async_trait]
-pub trait Notifiable: Sync + Send {
+pub trait Notifiable: Sync + Send + Debug {
     /// get the schedule type
     fn get_schedule(&self) -> Task;
 
@@ -302,19 +304,14 @@ fn get_next_time(now: OffsetDateTime, time: Time) -> OffsetDateTime {
     next
 }
 
-fn get_now() -> Option<OffsetDateTime> {
-    match OffsetDateTime::now_local() {
-        Ok(now) => Some(now),
-        Err(e) => {
-            error!("failed to get local time: {}", e);
-            None
-        }
-    }
+fn get_now() -> OffsetDateTime {
+    // FIXME:
+    OffsetDateTime::now_utc().to_offset(offset!(+8))
 }
 
 impl Scheduler {
     /// run wait task
-    #[instrument(skip(task, cancel))]
+    #[instrument(skip(cancel))]
     async fn run_wait<T: Notifiable + 'static>(task: T, cancel: CancellationToken) {
         if let Task::Wait(wait, skip) = task.get_schedule() {
             let task_ref = task;
@@ -327,21 +324,20 @@ impl Scheduler {
                         tracing::debug!(wait, "wait seconds");
                     }
                 };
-                if let Some(now) = get_now() {
-                    if let Some(skip) = skip {
-                        if skip.iter().any(|s| s.is_skip(now)) {
-                            task_ref.on_skip(cancel.clone()).await;
-                            return;
-                        }
+                let now = get_now();
+                if let Some(skip) = skip {
+                    if skip.iter().any(|s| s.is_skip(now)) {
+                        task_ref.on_skip(cancel.clone()).await;
+                        return;
                     }
-                    task_ref.on_time(cancel.clone()).await;
                 }
+                task_ref.on_time(cancel.clone()).await;
             });
         }
     }
 
     /// run interval task
-    #[instrument(skip(task, cancel))]
+    #[instrument(skip(cancel))]
     async fn run_interval<T: Notifiable + 'static>(task: T, cancel: CancellationToken) {
         if let Task::Interval(interval, skip) = task.get_schedule() {
             let task_ref = task;
@@ -355,38 +351,29 @@ impl Scheduler {
                             tracing::debug!(interval, "interval");
                         }
                     };
-                    if let Some(now) = get_now() {
-                        if let Some(ref skip) = skip {
-                            if skip.iter().any(|s| s.is_skip(now)) {
-                                task_ref.on_skip(cancel.clone()).await;
-                                continue;
-                            }
+                    let now = get_now();
+                    if let Some(ref skip) = skip {
+                        if skip.iter().any(|s| s.is_skip(now)) {
+                            task_ref.on_skip(cancel.clone()).await;
+                            continue;
                         }
-                        task_ref.on_time(cancel.clone()).await;
                     }
+                    task_ref.on_time(cancel.clone()).await;
                 }
             });
         }
     }
 
     /// run at task
-    #[instrument(skip(task, cancel))]
+    #[instrument(skip(cancel))]
     async fn run_at<T: Notifiable + 'static>(task: T, cancel: CancellationToken) {
         if let Task::At(time, skip) = task.get_schedule() {
             let task_ref = task;
             tokio::task::spawn(async move {
-                let now = if let Some(now) = get_now() {
-                    now
-                } else {
-                    return;
-                };
+                let now = get_now();
                 let mut next = get_next_time(now, time);
                 loop {
-                    let now = if let Some(now) = get_now() {
-                        now
-                    } else {
-                        return;
-                    };
+                    let now = get_now();
                     let seconds = (next - now).as_seconds_f64() as u64;
                     let instant = Instant::now() + Duration::from_secs(seconds);
                     select! {
@@ -419,24 +406,23 @@ impl Scheduler {
         if let Task::Once(next) = task.get_schedule() {
             let task_ref = task;
             tokio::task::spawn(async move {
-                if let Some(now) = get_now() {
-                    if next < now {
-                        task_ref.on_skip(cancel.clone()).await;
+                let now = get_now();
+                if next < now {
+                    task_ref.on_skip(cancel.clone()).await;
+                    return;
+                }
+                let seconds = (next - now).as_seconds_f64();
+                let instant = Instant::now() + Duration::from_secs(seconds as u64);
+
+                select! {
+                    _ = cancel.cancelled() => {
                         return;
                     }
-                    let seconds = (next - now).as_seconds_f64() as u64;
-                    let instant = Instant::now() + Duration::from_secs(seconds);
-
-                    select! {
-                        _ = cancel.cancelled() => {
-                            return;
-                        }
-                        _ = sleep_until(instant) => {
-                            tracing::debug!("once time");
-                        }
+                    _ = sleep_until(instant) => {
+                        tracing::debug!("once time");
                     }
-                    task_ref.on_time(cancel.clone()).await;
                 }
+                task_ref.on_time(cancel.clone()).await;
             });
         }
     }
