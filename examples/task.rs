@@ -2,6 +2,7 @@ use easy_schedule::prelude::*;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use time::OffsetDateTime;
+use time::macros::offset;
 
 #[derive(Debug, Clone)]
 struct WaitTask;
@@ -61,7 +62,7 @@ struct AtTask;
 #[async_trait]
 impl Notifiable for AtTask {
     fn get_schedule(&self) -> Task {
-        let now = OffsetDateTime::now_local().unwrap();
+        let now = OffsetDateTime::now_utc().to_offset(offset!(+8));
         let next = now + time::Duration::seconds(5);
         Task::At(next.time(), None)
     }
@@ -81,7 +82,7 @@ struct OnceTask;
 #[async_trait]
 impl Notifiable for OnceTask {
     fn get_schedule(&self) -> Task {
-        let now = OffsetDateTime::now_local().unwrap();
+        let now = OffsetDateTime::now_utc().to_offset(offset!(+8));
         let next = now + time::Duration::seconds(10);
         Task::Once(next)
     }

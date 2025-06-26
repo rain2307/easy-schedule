@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 use easy_schedule::prelude::*;
+use time::OffsetDateTime;
+use time::macros::offset;
 
 #[derive(Debug, Clone)]
 struct WaitTask;
@@ -23,7 +25,7 @@ impl Notifiable for WaitTask {
 
 #[tokio::main]
 async fn main() {
-    println!("start {}", time::OffsetDateTime::now_local().unwrap());
+    let _now = OffsetDateTime::now_utc().to_offset(offset!(+8));
     let scheduler = Scheduler::new();
     scheduler.run(WaitTask).await;
 
