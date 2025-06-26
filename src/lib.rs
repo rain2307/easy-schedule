@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use std::fmt::{self, Debug};
 use time::{
-    Date, OffsetDateTime, Time,
-    macros::{format_description, offset},
+    Date, OffsetDateTime, Time, UtcOffset,
+    macros::format_description,
 };
 use tokio::{
     select,
@@ -17,7 +17,7 @@ pub mod prelude {
     pub use tokio_util::sync::CancellationToken;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Skip {
     /// skip fixed date
     Date(Date),
@@ -67,17 +67,21 @@ impl Skip {
         match self {
             Skip::Date(date) => time.date() == *date,
             Skip::DateRange(start, end) => time.date() >= *start && time.date() <= *end,
-            Skip::Day(day) => day.contains(&(time.day() + 1)),
+            Skip::Day(day) => day.contains(&(time.weekday().number_from_monday())), 
             Skip::DayRange(start, end) => {
-                time.day() + 1 >= *start as u8 && time.day() + 1 <= *end as u8
+                let weekday = time.weekday().number_from_monday() as usize;
+                weekday >= *start && weekday <= *end
             }
-            Skip::Time(time) => time.hour() == time.hour() && time.minute() == time.minute(),
+            Skip::Time(skip_time) => time.time() == *skip_time,
             Skip::TimeRange(start, end) => {
-                assert!(start < end, "start must be less than end");
-                time.hour() >= start.hour()
-                    && time.hour() <= end.hour()
-                    && time.minute() >= start.minute()
-                    && time.minute() <= end.minute()
+                let current_time = time.time();
+                if start <= end {
+                    // 同一天内的时间范围
+                    current_time >= *start && current_time <= *end
+                } else {
+                    // 跨日期的时间范围 (如 22:00 - 06:00)
+                    current_time >= *start || current_time <= *end
+                }
             }
             Skip::None => false,
         }
@@ -93,55 +97,95 @@ pub enum Task {
     /// at time
     At(Time, Option<Vec<Skip>>),
     /// exact time
-    Once(OffsetDateTime),
+    Once(OffsetDateTime, Option<Vec<Skip>>),
 }
 
 impl PartialEq for Task {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Task::Wait(a, _), Task::Wait(b, _)) => a == b,
-            (Task::Interval(a, _), Task::Interval(b, _)) => a == b,
-            (Task::At(a, _), Task::At(b, _)) => a == b,
-            (Task::Once(a), Task::Once(b)) => a == b,
+            (Task::Wait(a, skip_a), Task::Wait(b, skip_b)) => a == b && skip_a == skip_b,
+            (Task::Interval(a, skip_a), Task::Interval(b, skip_b)) => a == b && skip_a == skip_b,
+            (Task::At(a, skip_a), Task::At(b, skip_b)) => a == b && skip_a == skip_b,
+            (Task::Once(a, skip_a), Task::Once(b, skip_b)) => a == b && skip_a == skip_b,
             _ => false,
         }
     }
 }
 
-impl From<&str> for Task {
-    ///
-    /// - wait=10
-    /// - interval=10
-    /// - at=10:00
-    /// - once=2024-01-01 10:00:00
-    fn from(s: &str) -> Self {
-        let parts = s.split("=").collect::<Vec<&str>>();
-        let task = parts[0];
-        let value = parts[1..].join("");
-        match task {
+impl Task {
+    /// Parse a task from a string with detailed error reporting.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use easy_schedule::Task;
+    /// 
+    /// let task = Task::parse("wait(10)").unwrap();
+    /// 
+    /// match Task::parse("invalid") {
+    ///     Ok(task) => println!("Success: {}", task),
+    ///     Err(err) => println!("Error: {}", err),
+    /// }
+    /// ```
+    pub fn parse(s: &str) -> Result<Self, String> {
+        let s = s.trim();
+        
+        // Find the function name and arguments
+        let open_paren = s.find('(')
+            .ok_or_else(|| format!("Invalid task format: '{}'. Expected format like 'wait(10)'", s))?;
+        
+        let close_paren = s.rfind(')')
+            .ok_or_else(|| format!("Missing closing parenthesis in: '{}'", s))?;
+        
+        if close_paren <= open_paren {
+            return Err(format!("Invalid parentheses in: '{}'", s));
+        }
+        
+        let function_name = s[..open_paren].trim();
+        let args = s[open_paren + 1..close_paren].trim();
+        
+        match function_name {
             "wait" => {
-                let seconds = value.parse::<u64>().unwrap();
-                Task::Wait(seconds, None)
+                let seconds = args.parse::<u64>()
+                    .map_err(|_| format!("Invalid seconds value '{}' in wait({})", args, args))?;
+                Ok(Task::Wait(seconds, None))
             }
             "interval" => {
-                let seconds = value.parse::<u64>().unwrap();
-                Task::Interval(seconds, None)
+                let seconds = args.parse::<u64>()
+                    .map_err(|_| format!("Invalid seconds value '{}' in interval({})", args, args))?;
+                Ok(Task::Interval(seconds, None))
             }
             "at" => {
                 let format = format_description!("[hour]:[minute]");
-                let time = Time::parse(&value, &format).expect("parse time failed");
-                Task::At(time, None)
+                let time = Time::parse(args, &format)
+                    .map_err(|_| format!("Invalid time format '{}' in at({}). Expected format: HH:MM", args, args))?;
+                Ok(Task::At(time, None))
             }
             "once" => {
                 let format = format_description!(
                     "[year]-[month]-[day] [hour]:[minute]:[second] [offset_hour sign:mandatory]"
                 );
-                let datetime =
-                    OffsetDateTime::parse(&value, &format).expect("parse datetime failed");
-                Task::Once(datetime)
+                let datetime = OffsetDateTime::parse(args, &format)
+                    .map_err(|_| format!("Invalid datetime format '{}' in once({}). Expected format: YYYY-MM-DD HH:MM:SS +HH", args, args))?;
+                Ok(Task::Once(datetime, None))
             }
-            _ => Task::Wait(5, None),
+            _ => Err(format!("Unknown task type '{}'. Supported types: wait, interval, at, once", function_name)),
         }
+    }
+}
+
+impl From<&str> for Task {
+    /// Parse a task from a string, panicking on parse errors.
+    /// 
+    /// For better error handling, consider using `Task::parse()` instead.
+    /// 
+    /// # Panics
+    /// 
+    /// Panics if the string cannot be parsed as a valid task.
+    fn from(s: &str) -> Self {
+        Task::parse(s).unwrap_or_else(|err| {
+            panic!("Failed to parse task from string '{}': {}", s, err);
+        })
     }
 }
 
@@ -163,32 +207,32 @@ mod tests {
 
     #[test]
     fn test_from_string() {
-        let task = Task::from("wait=10");
+        let task = Task::from("wait(10)");
         assert_eq!(task, Task::Wait(10, None));
-        let task = Task::from("wait=10".to_string());
+        let task = Task::from("wait(10)".to_string());
         assert_eq!(task, Task::Wait(10, None));
-        let task = Task::from(&"wait=10".to_string());
+        let task = Task::from(&"wait(10)".to_string());
         assert_eq!(task, Task::Wait(10, None));
     }
 
     #[test]
     fn test_from_string_interval() {
-        let task = Task::from("interval=10");
+        let task = Task::from("interval(10)");
         assert_eq!(task, Task::Interval(10, None));
     }
 
     #[test]
     fn test_from_string_at() {
-        let task = Task::from("at=10:00");
+        let task = Task::from("at(10:00)");
         assert_eq!(task, Task::At(Time::from_hms(10, 0, 0).unwrap(), None));
     }
 
     #[test]
     fn test_from_string_once() {
-        let task = Task::from("once=2024-01-01 10:00:00 +08");
+        let task = Task::from("once(2024-01-01 10:00:00 +08)");
         assert_eq!(
             task,
-            Task::Once(OffsetDateTime::from_unix_timestamp(1704074400).unwrap())
+            Task::Once(OffsetDateTime::from_unix_timestamp(1704074400).unwrap(), None)
         );
     }
 }
@@ -226,7 +270,16 @@ impl fmt::Display for Task {
                     .join(", ");
                 write!(f, "at: {} {}", time, skip)
             }
-            Task::Once(time) => write!(f, "once: {}", time),
+            Task::Once(time, skip) => {
+                let skip = skip
+                    .clone()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                write!(f, "once: {} {}", time, skip)
+            },
         }
     }
 }
@@ -252,13 +305,28 @@ pub trait Notifiable: Sync + Send + Debug {
 
 pub struct Scheduler {
     cancel: CancellationToken,
+    timezone_minutes: i16,
 }
 
 impl Scheduler {
-    /// create a new scheduler
+    /// create a new scheduler with default timezone (+8)
     pub fn new() -> Self {
+        Self::with_timezone(8, 0)
+    }
+
+    /// create a new scheduler with specified timezone hours offset
+    pub fn with_timezone(timezone_hours: i8, timezone_minutes: i8) -> Self {
         Self {
             cancel: CancellationToken::new(),
+            timezone_minutes: (timezone_hours as i16) * 60 + (timezone_minutes as i16),
+        }
+    }
+
+    /// create a new scheduler with timezone offset in minutes
+    pub fn with_timezone_minutes(timezone_minutes: i16) -> Self {
+        Self {
+            cancel: CancellationToken::new(),
+            timezone_minutes,
         }
     }
 
@@ -266,19 +334,20 @@ impl Scheduler {
     pub async fn run<T: Notifiable + 'static>(&self, task: T) {
         let schedule = task.get_schedule();
         let cancel = self.cancel.clone();
+        let timezone_minutes = self.timezone_minutes;
 
         match schedule {
             Task::Wait(..) => {
-                Scheduler::run_wait(task, cancel.clone()).await;
+                Scheduler::run_wait(task, cancel.clone(), timezone_minutes).await;
             }
             Task::Interval(..) => {
-                Scheduler::run_interval(task, cancel.clone()).await;
+                Scheduler::run_interval(task, cancel.clone(), timezone_minutes).await;
             }
             Task::At(..) => {
-                Scheduler::run_at(task, cancel.clone()).await;
+                Scheduler::run_at(task, cancel.clone(), timezone_minutes).await;
             }
             Task::Once(..) => {
-                Scheduler::run_once(task, cancel.clone()).await;
+                Scheduler::run_once(task, cancel.clone(), timezone_minutes).await;
             }
         }
     }
@@ -304,15 +373,17 @@ fn get_next_time(now: OffsetDateTime, time: Time) -> OffsetDateTime {
     next
 }
 
-fn get_now() -> OffsetDateTime {
-    // FIXME:
-    OffsetDateTime::now_utc().to_offset(offset!(+8))
+fn get_now(timezone_minutes: i16) -> Result<OffsetDateTime, time::error::ComponentRange> {
+    let hours = timezone_minutes / 60;
+    let minutes = timezone_minutes % 60;
+    let offset = UtcOffset::from_hms(hours as i8, minutes as i8, 0)?;
+    Ok(OffsetDateTime::now_utc().to_offset(offset))
 }
 
 impl Scheduler {
     /// run wait task
     #[instrument(skip(cancel))]
-    async fn run_wait<T: Notifiable + 'static>(task: T, cancel: CancellationToken) {
+    async fn run_wait<T: Notifiable + 'static>(task: T, cancel: CancellationToken, timezone_minutes: i16) {
         if let Task::Wait(wait, skip) = task.get_schedule() {
             let task_ref = task;
             tokio::task::spawn(async move {
@@ -324,7 +395,7 @@ impl Scheduler {
                         tracing::debug!(wait, "wait seconds");
                     }
                 };
-                let now = get_now();
+                let now = get_now(timezone_minutes).unwrap_or_else(|_| OffsetDateTime::now_utc());
                 if let Some(skip) = skip {
                     if skip.iter().any(|s| s.is_skip(now)) {
                         task_ref.on_skip(cancel.clone()).await;
@@ -338,7 +409,7 @@ impl Scheduler {
 
     /// run interval task
     #[instrument(skip(cancel))]
-    async fn run_interval<T: Notifiable + 'static>(task: T, cancel: CancellationToken) {
+    async fn run_interval<T: Notifiable + 'static>(task: T, cancel: CancellationToken, timezone_minutes: i16) {
         if let Task::Interval(interval, skip) = task.get_schedule() {
             let task_ref = task;
             tokio::task::spawn(async move {
@@ -351,7 +422,7 @@ impl Scheduler {
                             tracing::debug!(interval, "interval");
                         }
                     };
-                    let now = get_now();
+                    let now = get_now(timezone_minutes).unwrap_or_else(|_| OffsetDateTime::now_utc());
                     if let Some(ref skip) = skip {
                         if skip.iter().any(|s| s.is_skip(now)) {
                             task_ref.on_skip(cancel.clone()).await;
@@ -366,14 +437,14 @@ impl Scheduler {
 
     /// run at task
     #[instrument(skip(cancel))]
-    async fn run_at<T: Notifiable + 'static>(task: T, cancel: CancellationToken) {
+    async fn run_at<T: Notifiable + 'static>(task: T, cancel: CancellationToken, timezone_minutes: i16) {
         if let Task::At(time, skip) = task.get_schedule() {
             let task_ref = task;
             tokio::task::spawn(async move {
-                let now = get_now();
+                let now = get_now(timezone_minutes).unwrap_or_else(|_| OffsetDateTime::now_utc());
                 let mut next = get_next_time(now, time);
                 loop {
-                    let now = get_now();
+                    let now = get_now(timezone_minutes).unwrap_or_else(|_| OffsetDateTime::now_utc());
                     let seconds = (next - now).as_seconds_f64() as u64;
                     let instant = Instant::now() + Duration::from_secs(seconds);
                     select! {
@@ -386,9 +457,10 @@ impl Scheduler {
                     }
 
                     if let Some(skip) = skip.clone() {
-                        if skip.iter().any(|s| s.is_skip(now)) {
+                        if skip.iter().any(|s| s.is_skip(next)) {
                             task_ref.on_skip(cancel.clone()).await;
-                            return;
+                            next += time::Duration::days(1);
+                            continue;
                         }
                     }
 
@@ -402,14 +474,21 @@ impl Scheduler {
 
     /// run once task
     #[instrument(skip(task, cancel))]
-    async fn run_once<T: Notifiable + 'static>(task: T, cancel: CancellationToken) {
-        if let Task::Once(next) = task.get_schedule() {
+    async fn run_once<T: Notifiable + 'static>(task: T, cancel: CancellationToken, timezone_minutes: i16) {
+        if let Task::Once(next, skip) = task.get_schedule() {
             let task_ref = task;
             tokio::task::spawn(async move {
-                let now = get_now();
+                let now = get_now(timezone_minutes).unwrap_or_else(|_| OffsetDateTime::now_utc());
                 if next < now {
                     task_ref.on_skip(cancel.clone()).await;
                     return;
+                }
+                
+                if let Some(skip) = skip {
+                    if skip.iter().any(|s| s.is_skip(next)) {
+                        task_ref.on_skip(cancel.clone()).await;
+                        return;
+                    }
                 }
                 let seconds = (next - now).as_seconds_f64();
                 let instant = Instant::now() + Duration::from_secs(seconds as u64);
