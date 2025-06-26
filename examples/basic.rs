@@ -1,12 +1,17 @@
 use easy_schedule::prelude::*;
-use time::{OffsetDateTime, Time, macros::offset};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use time::{OffsetDateTime, Time, macros::offset};
 
 fn print_time(name: &str) {
     let now = OffsetDateTime::now_utc().to_offset(offset!(+8));
     let format = time::macros::format_description!("[hour]:[minute]:[second]");
-    println!("[{}] {}: {}", now.format(&format).unwrap(), name, "executed");
+    println!(
+        "[{}] {}: {}",
+        now.format(&format).unwrap(),
+        name,
+        "executed"
+    );
 }
 
 #[derive(Debug)]
@@ -104,7 +109,9 @@ async fn main() {
     println!("Stopping scheduler...");
     scheduler.stop();
 
-    println!("Final counts - Wait: {}, Interval: {}", 
-        wait_counter.load(Ordering::SeqCst), 
-        interval_counter.load(Ordering::SeqCst));
+    println!(
+        "Final counts - Wait: {}, Interval: {}",
+        wait_counter.load(Ordering::SeqCst),
+        interval_counter.load(Ordering::SeqCst)
+    );
 }

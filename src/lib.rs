@@ -1,9 +1,6 @@
 use async_trait::async_trait;
 use std::fmt::{self, Debug};
-use time::{
-    Date, OffsetDateTime, Time, UtcOffset,
-    macros::format_description,
-};
+use time::{Date, OffsetDateTime, Time, UtcOffset, macros::format_description};
 use tokio::{
     select,
     time::{Duration, Instant, sleep, sleep_until},
@@ -67,7 +64,7 @@ impl Skip {
         match self {
             Skip::Date(date) => time.date() == *date,
             Skip::DateRange(start, end) => time.date() >= *start && time.date() <= *end,
-            Skip::Day(day) => day.contains(&(time.weekday().number_from_monday())), 
+            Skip::Day(day) => day.contains(&(time.weekday().number_from_monday())),
             Skip::DayRange(start, end) => {
                 let weekday = time.weekday().number_from_monday() as usize;
                 weekday >= *start && weekday <= *end
@@ -114,14 +111,14 @@ impl PartialEq for Task {
 
 impl Task {
     /// Parse a task from a string with detailed error reporting.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use easy_schedule::Task;
-    /// 
+    ///
     /// let task = Task::parse("wait(10)").unwrap();
-    /// 
+    ///
     /// match Task::parse("invalid") {
     ///     Ok(task) => println!("Success: {}", task),
     ///     Err(err) => println!("Error: {}", err),
@@ -129,36 +126,47 @@ impl Task {
     /// ```
     pub fn parse(s: &str) -> Result<Self, String> {
         let s = s.trim();
-        
+
         // Find the function name and arguments
-        let open_paren = s.find('(')
-            .ok_or_else(|| format!("Invalid task format: '{}'. Expected format like 'wait(10)'", s))?;
-        
-        let close_paren = s.rfind(')')
+        let open_paren = s.find('(').ok_or_else(|| {
+            format!(
+                "Invalid task format: '{}'. Expected format like 'wait(10)'",
+                s
+            )
+        })?;
+
+        let close_paren = s
+            .rfind(')')
             .ok_or_else(|| format!("Missing closing parenthesis in: '{}'", s))?;
-        
+
         if close_paren <= open_paren {
             return Err(format!("Invalid parentheses in: '{}'", s));
         }
-        
+
         let function_name = s[..open_paren].trim();
         let args = s[open_paren + 1..close_paren].trim();
-        
+
         match function_name {
             "wait" => {
-                let seconds = args.parse::<u64>()
+                let seconds = args
+                    .parse::<u64>()
                     .map_err(|_| format!("Invalid seconds value '{}' in wait({})", args, args))?;
                 Ok(Task::Wait(seconds, None))
             }
             "interval" => {
-                let seconds = args.parse::<u64>()
-                    .map_err(|_| format!("Invalid seconds value '{}' in interval({})", args, args))?;
+                let seconds = args.parse::<u64>().map_err(|_| {
+                    format!("Invalid seconds value '{}' in interval({})", args, args)
+                })?;
                 Ok(Task::Interval(seconds, None))
             }
             "at" => {
                 let format = format_description!("[hour]:[minute]");
-                let time = Time::parse(args, &format)
-                    .map_err(|_| format!("Invalid time format '{}' in at({}). Expected format: HH:MM", args, args))?;
+                let time = Time::parse(args, &format).map_err(|_| {
+                    format!(
+                        "Invalid time format '{}' in at({}). Expected format: HH:MM",
+                        args, args
+                    )
+                })?;
                 Ok(Task::At(time, None))
             }
             "once" => {
@@ -169,18 +177,21 @@ impl Task {
                     .map_err(|_| format!("Invalid datetime format '{}' in once({}). Expected format: YYYY-MM-DD HH:MM:SS +HH", args, args))?;
                 Ok(Task::Once(datetime, None))
             }
-            _ => Err(format!("Unknown task type '{}'. Supported types: wait, interval, at, once", function_name)),
+            _ => Err(format!(
+                "Unknown task type '{}'. Supported types: wait, interval, at, once",
+                function_name
+            )),
         }
     }
 }
 
 impl From<&str> for Task {
     /// Parse a task from a string, panicking on parse errors.
-    /// 
+    ///
     /// For better error handling, consider using `Task::parse()` instead.
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// Panics if the string cannot be parsed as a valid task.
     fn from(s: &str) -> Self {
         Task::parse(s).unwrap_or_else(|err| {
@@ -232,7 +243,10 @@ mod tests {
         let task = Task::from("once(2024-01-01 10:00:00 +08)");
         assert_eq!(
             task,
-            Task::Once(OffsetDateTime::from_unix_timestamp(1704074400).unwrap(), None)
+            Task::Once(
+                OffsetDateTime::from_unix_timestamp(1704074400).unwrap(),
+                None
+            )
         );
     }
 }
@@ -279,7 +293,7 @@ impl fmt::Display for Task {
                     .collect::<Vec<String>>()
                     .join(", ");
                 write!(f, "once: {} {}", time, skip)
-            },
+            }
         }
     }
 }
@@ -383,7 +397,11 @@ fn get_now(timezone_minutes: i16) -> Result<OffsetDateTime, time::error::Compone
 impl Scheduler {
     /// run wait task
     #[instrument(skip(cancel))]
-    async fn run_wait<T: Notifiable + 'static>(task: T, cancel: CancellationToken, timezone_minutes: i16) {
+    async fn run_wait<T: Notifiable + 'static>(
+        task: T,
+        cancel: CancellationToken,
+        timezone_minutes: i16,
+    ) {
         if let Task::Wait(wait, skip) = task.get_schedule() {
             let task_ref = task;
             tokio::task::spawn(async move {
@@ -409,7 +427,11 @@ impl Scheduler {
 
     /// run interval task
     #[instrument(skip(cancel))]
-    async fn run_interval<T: Notifiable + 'static>(task: T, cancel: CancellationToken, timezone_minutes: i16) {
+    async fn run_interval<T: Notifiable + 'static>(
+        task: T,
+        cancel: CancellationToken,
+        timezone_minutes: i16,
+    ) {
         if let Task::Interval(interval, skip) = task.get_schedule() {
             let task_ref = task;
             tokio::task::spawn(async move {
@@ -422,7 +444,8 @@ impl Scheduler {
                             tracing::debug!(interval, "interval");
                         }
                     };
-                    let now = get_now(timezone_minutes).unwrap_or_else(|_| OffsetDateTime::now_utc());
+                    let now =
+                        get_now(timezone_minutes).unwrap_or_else(|_| OffsetDateTime::now_utc());
                     if let Some(ref skip) = skip {
                         if skip.iter().any(|s| s.is_skip(now)) {
                             task_ref.on_skip(cancel.clone()).await;
@@ -437,14 +460,19 @@ impl Scheduler {
 
     /// run at task
     #[instrument(skip(cancel))]
-    async fn run_at<T: Notifiable + 'static>(task: T, cancel: CancellationToken, timezone_minutes: i16) {
+    async fn run_at<T: Notifiable + 'static>(
+        task: T,
+        cancel: CancellationToken,
+        timezone_minutes: i16,
+    ) {
         if let Task::At(time, skip) = task.get_schedule() {
             let task_ref = task;
             tokio::task::spawn(async move {
                 let now = get_now(timezone_minutes).unwrap_or_else(|_| OffsetDateTime::now_utc());
                 let mut next = get_next_time(now, time);
                 loop {
-                    let now = get_now(timezone_minutes).unwrap_or_else(|_| OffsetDateTime::now_utc());
+                    let now =
+                        get_now(timezone_minutes).unwrap_or_else(|_| OffsetDateTime::now_utc());
                     let seconds = (next - now).as_seconds_f64() as u64;
                     let instant = Instant::now() + Duration::from_secs(seconds);
                     select! {
@@ -474,7 +502,11 @@ impl Scheduler {
 
     /// run once task
     #[instrument(skip(task, cancel))]
-    async fn run_once<T: Notifiable + 'static>(task: T, cancel: CancellationToken, timezone_minutes: i16) {
+    async fn run_once<T: Notifiable + 'static>(
+        task: T,
+        cancel: CancellationToken,
+        timezone_minutes: i16,
+    ) {
         if let Task::Once(next, skip) = task.get_schedule() {
             let task_ref = task;
             tokio::task::spawn(async move {
@@ -483,7 +515,7 @@ impl Scheduler {
                     task_ref.on_skip(cancel.clone()).await;
                     return;
                 }
-                
+
                 if let Some(skip) = skip {
                     if skip.iter().any(|s| s.is_skip(next)) {
                         task_ref.on_skip(cancel.clone()).await;

@@ -4,7 +4,12 @@ use time::{OffsetDateTime, macros::offset};
 fn print_time(name: &str) {
     let now = OffsetDateTime::now_utc().to_offset(offset!(+8));
     let format = time::macros::format_description!("[hour]:[minute]:[second]");
-    println!("[{}] {}: {}", now.format(&format).unwrap(), name, "executed");
+    println!(
+        "[{}] {}: {}",
+        now.format(&format).unwrap(),
+        name,
+        "executed"
+    );
 }
 
 #[derive(Debug)]
@@ -45,7 +50,10 @@ async fn main() {
         StringTask::new("wait(3)", "Wait 3 seconds"),
         StringTask::new("interval(2)", "Interval 2 seconds"),
         StringTask::new("at(23:59)", "At 23:59"),
-        StringTask::new("once(2024-12-31 23:59:59 +08)", "Once at 2024-12-31 23:59:59"),
+        StringTask::new(
+            "once(2024-12-31 23:59:59 +08)",
+            "Once at 2024-12-31 23:59:59",
+        ),
     ];
 
     println!("Task parsing demonstration:");
