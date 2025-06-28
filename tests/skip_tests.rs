@@ -1,4 +1,4 @@
-use easy_schedule::Skip;
+use easy_schedule::prelude::Skip;
 use time::{
     OffsetDateTime,
     macros::{date, time},

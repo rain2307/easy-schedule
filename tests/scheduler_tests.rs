@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use easy_schedule::{Notifiable, Scheduler, Skip, Task};
+use easy_schedule::prelude::*;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
