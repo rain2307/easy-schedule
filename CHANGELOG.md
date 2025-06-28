@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.11.0](https://github.com/rain2307/easy-schedule/compare/v0.8.1...v0.11.0) (2025-06-28)
+
+
+### Features
+
+* add task! macro for simplified Task creation syntax ([aa18e0a](https://github.com/rain2307/easy-schedule/commit/aa18e0a))
+* support skip conditions in macro syntax ([aa18e0a](https://github.com/rain2307/easy-schedule/commit/aa18e0a))
+
+
+### Bug Fixes
+
+* fix clippy warnings and format issues ([26a5082](https://github.com/rain2307/easy-schedule/commit/26a5082))
+* improve cross-platform CI support ([0a8e159](https://github.com/rain2307/easy-schedule/commit/0a8e159))
+
 ## [0.8.1](https://github.com/rain2307/easy-schedule/compare/v0.8.0...v0.8.1) (2025-06-28)
 
 
