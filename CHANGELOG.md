@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/rain2307/easy-schedule/compare/v0.8.0...v0.8.1) (2025-06-28)
+
+
+### Bug Fixes
+
+* token ([6128c6c](https://github.com/rain2307/easy-schedule/commit/6128c6cd60e78db8c52db5cf8e39dbbd353de132))
+
 ## [0.8.0](https://github.com/rain2307/easy-schedule/compare/v0.7.0...v0.8.0) (2025-06-28)
 
 
