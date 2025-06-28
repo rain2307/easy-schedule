@@ -23,7 +23,7 @@ impl Notifiable for SkipWeekendTask {
 
     async fn on_time(&self, cancel: CancellationToken) {
         let count = self.0.fetch_add(1, Ordering::SeqCst) + 1;
-        print_time(&format!("SkipWeekendTask #{} (weekday only)", count));
+        print_time(&format!("SkipWeekendTask #{count} (weekday only)"));
         if count >= 10 {
             cancel.cancel();
         }
@@ -51,7 +51,7 @@ impl Notifiable for SkipNightTask {
 
     async fn on_time(&self, cancel: CancellationToken) {
         let count = self.0.fetch_add(1, Ordering::SeqCst) + 1;
-        print_time(&format!("SkipNightTask #{} (daytime only)", count));
+        print_time(&format!("SkipNightTask #{count} (daytime only)"));
         if count >= 15 {
             cancel.cancel();
         }

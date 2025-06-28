@@ -34,12 +34,12 @@ impl Default for Skip {
 impl fmt::Display for Skip {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Skip::Date(date) => write!(f, "date: {}", date),
-            Skip::DateRange(start, end) => write!(f, "date range: {} - {}", start, end),
-            Skip::Day(day) => write!(f, "day: {:?}", day),
-            Skip::DayRange(start, end) => write!(f, "day range: {} - {}", start, end),
-            Skip::Time(time) => write!(f, "time: {}", time),
-            Skip::TimeRange(start, end) => write!(f, "time range: {} - {}", start, end),
+            Skip::Date(date) => write!(f, "date: {date}"),
+            Skip::DateRange(start, end) => write!(f, "date range: {start} - {end}"),
+            Skip::Day(day) => write!(f, "day: {day:?}"),
+            Skip::DayRange(start, end) => write!(f, "day range: {start} - {end}"),
+            Skip::Time(time) => write!(f, "time: {time}"),
+            Skip::TimeRange(start, end) => write!(f, "time range: {start} - {end}"),
             Skip::None => write!(f, "none"),
         }
     }
@@ -116,18 +116,15 @@ impl Task {
 
         // Find the function name and arguments
         let open_paren = s.find('(').ok_or_else(|| {
-            format!(
-                "Invalid task format: '{}'. Expected format like 'wait(10)'",
-                s
-            )
+            format!("Invalid task format: '{s}'. Expected format like 'wait(10)'")
         })?;
 
         let close_paren = s
             .rfind(')')
-            .ok_or_else(|| format!("Missing closing parenthesis in: '{}'", s))?;
+            .ok_or_else(|| format!("Missing closing parenthesis in: '{s}'"))?;
 
         if close_paren <= open_paren {
-            return Err(format!("Invalid parentheses in: '{}'", s));
+            return Err(format!("Invalid parentheses in: '{s}'"));
         }
 
         let function_name = s[..open_paren].trim();
@@ -137,22 +134,19 @@ impl Task {
             "wait" => {
                 let seconds = args
                     .parse::<u64>()
-                    .map_err(|_| format!("Invalid seconds value '{}' in wait({})", args, args))?;
+                    .map_err(|_| format!("Invalid seconds value '{args}' in wait({args})"))?;
                 Ok(Task::Wait(seconds, None))
             }
             "interval" => {
                 let seconds = args.parse::<u64>().map_err(|_| {
-                    format!("Invalid seconds value '{}' in interval({})", args, args)
+                    format!("Invalid seconds value '{args}' in interval({args})")
                 })?;
                 Ok(Task::Interval(seconds, None))
             }
             "at" => {
                 let format = format_description!("[hour]:[minute]");
                 let time = Time::parse(args, &format).map_err(|_| {
-                    format!(
-                        "Invalid time format '{}' in at({}). Expected format: HH:MM",
-                        args, args
-                    )
+                    format!("Invalid time format '{args}' in at({args}). Expected format: HH:MM")
                 })?;
                 Ok(Task::At(time, None))
             }
@@ -161,13 +155,10 @@ impl Task {
                     "[year]-[month]-[day] [hour]:[minute]:[second] [offset_hour sign:mandatory]"
                 );
                 let datetime = OffsetDateTime::parse(args, &format)
-                    .map_err(|_| format!("Invalid datetime format '{}' in once({}). Expected format: YYYY-MM-DD HH:MM:SS +HH", args, args))?;
+                    .map_err(|_| format!("Invalid datetime format '{args}' in once({args}). Expected format: YYYY-MM-DD HH:MM:SS +HH"))?;
                 Ok(Task::Once(datetime, None))
             }
-            _ => Err(format!(
-                "Unknown task type '{}'. Supported types: wait, interval, at, once",
-                function_name
-            )),
+            _ => Err(format!("Unknown task type '{function_name}'. Supported types: wait, interval, at, once")),
         }
     }
 }
@@ -182,7 +173,7 @@ impl From<&str> for Task {
     /// Panics if the string cannot be parsed as a valid task.
     fn from(s: &str) -> Self {
         Task::parse(s).unwrap_or_else(|err| {
-            panic!("Failed to parse task from string '{}': {}", s, err);
+            panic!("Failed to parse task from string '{s}': {err}");
         })
     }
 }
@@ -325,7 +316,7 @@ impl fmt::Display for Task {
                     .map(|s| s.to_string())
                     .collect::<Vec<String>>()
                     .join(", ");
-                write!(f, "wait: {} {}", wait, skip)
+                write!(f, "wait: {wait} {skip}")
             }
             Task::Interval(interval, skip) => {
                 let skip = skip
@@ -335,7 +326,7 @@ impl fmt::Display for Task {
                     .map(|s| s.to_string())
                     .collect::<Vec<String>>()
                     .join(", ");
-                write!(f, "interval: {} {}", interval, skip)
+                write!(f, "interval: {interval} {skip}")
             }
             Task::At(time, skip) => {
                 let skip = skip
@@ -345,7 +336,7 @@ impl fmt::Display for Task {
                     .map(|s| s.to_string())
                     .collect::<Vec<String>>()
                     .join(", ");
-                write!(f, "at: {} {}", time, skip)
+                write!(f, "at: {time} {skip}")
             }
             Task::Once(time, skip) => {
                 let skip = skip
@@ -355,7 +346,7 @@ impl fmt::Display for Task {
                     .map(|s| s.to_string())
                     .collect::<Vec<String>>()
                     .join(", ");
-                write!(f, "once: {} {}", time, skip)
+                write!(f, "once: {time} {skip}")
             }
         }
     }

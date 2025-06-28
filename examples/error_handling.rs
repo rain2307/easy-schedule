@@ -15,8 +15,8 @@ fn main() {
 
     for task_str in valid_tasks {
         match Task::parse(task_str) {
-            Ok(task) => println!("✓ '{}' -> {}", task_str, task),
-            Err(err) => println!("✗ '{}' -> Error: {}", task_str, err),
+            Ok(task) => println!("✓ '{task_str}' -> {task}"),
+            Err(err) => println!("✗ '{task_str}' -> Error: {err}"),
         }
     }
 
@@ -34,8 +34,8 @@ fn main() {
 
     for task_str in invalid_tasks {
         match Task::parse(task_str) {
-            Ok(task) => println!("✓ '{}' -> {}", task_str, task),
-            Err(err) => println!("✗ '{}' -> Error: {}", task_str, err),
+            Ok(task) => println!("✓ '{task_str}' -> {task}"),
+            Err(err) => println!("✗ '{task_str}' -> Error: {err}"),
         }
     }
 
@@ -45,11 +45,11 @@ fn main() {
 
     match Task::parse(user_input) {
         Ok(task) => {
-            println!("Task created successfully: {}", task);
+            println!("Task created successfully: {task}");
             // Use the task...
         }
         Err(err) => {
-            println!("Failed to create task: {}", err);
+            println!("Failed to create task: {err}");
             println!("Please check your input format.");
             // Show help or default behavior...
         }

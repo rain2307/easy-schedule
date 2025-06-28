@@ -20,7 +20,7 @@ impl Notifiable for WaitTask {
 
     async fn on_time(&self, cancel: CancellationToken) {
         let count = self.0.fetch_add(1, Ordering::SeqCst) + 1;
-        print_time(&format!("WaitTask #{}", count));
+        print_time(&format!("WaitTask #{count}"));
         if count >= 3 {
             cancel.cancel();
         }
@@ -38,7 +38,7 @@ impl Notifiable for IntervalTask {
 
     async fn on_time(&self, cancel: CancellationToken) {
         let count = self.0.fetch_add(1, Ordering::SeqCst) + 1;
-        print_time(&format!("IntervalTask #{}", count));
+        print_time(&format!("IntervalTask #{count}"));
         if count >= 5 {
             cancel.cancel();
         }

@@ -115,8 +115,8 @@ fn test_skip_display() {
     let day_skip = Skip::Day(vec![1, 2, 3]);
     let none_skip = Skip::None;
 
-    assert_eq!(format!("{}", date_skip), "date: 2024-12-25");
-    assert!(format!("{}", time_skip).starts_with("time: 14:30:00"));
-    assert_eq!(format!("{}", day_skip), "day: [1, 2, 3]");
-    assert_eq!(format!("{}", none_skip), "none");
+    assert_eq!(format!("{date_skip}"), "date: 2024-12-25");
+    assert!(format!("{time_skip}").starts_with("time: 14:30:00"));
+    assert_eq!(format!("{day_skip}"), "day: [1, 2, 3]");
+    assert_eq!(format!("{none_skip}"), "none");
 }

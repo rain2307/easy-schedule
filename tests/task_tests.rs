@@ -120,10 +120,10 @@ fn test_task_display() {
     let at_task = Task::At(time!(14:30:00), None);
     let once_task = Task::Once(OffsetDateTime::now_utc().to_offset(offset!(+8)), None);
 
-    assert!(format!("{}", wait_task).starts_with("wait: 10"));
-    assert!(format!("{}", interval_task).starts_with("interval: 30"));
-    assert!(format!("{}", at_task).starts_with("at: 14:30:00"));
-    assert!(format!("{}", once_task).starts_with("once:"));
+    assert!(format!("{wait_task}").starts_with("wait: 10"));
+    assert!(format!("{interval_task}").starts_with("interval: 30"));
+    assert!(format!("{at_task}").starts_with("at: 14:30:00"));
+    assert!(format!("{once_task}").starts_with("once:"));
 }
 
 #[test]
@@ -131,7 +131,7 @@ fn test_task_display_with_skip() {
     let skip = Some(vec![Skip::Day(vec![1, 2]), Skip::Time(time!(12:00:00))]);
     let wait_task = Task::Wait(10, skip);
 
-    let display = format!("{}", wait_task);
+    let display = format!("{wait_task}");
     assert!(display.contains("wait: 10"));
     assert!(display.contains("day: [1, 2]"));
     assert!(display.contains("time: 12:00:00"));
@@ -148,7 +148,7 @@ fn test_task_clone() {
 #[test]
 fn test_task_debug() {
     let task = Task::Wait(10, None);
-    let debug_str = format!("{:?}", task);
+    let debug_str = format!("{task:?}");
 
     assert!(debug_str.contains("Wait"));
     assert!(debug_str.contains("10"));
