@@ -199,6 +199,121 @@ impl From<&String> for Task {
     }
 }
 
+#[macro_export]
+macro_rules! task {
+    // 基础任务，无skip
+    (wait $seconds:tt) => {
+        $crate::Task::Wait($seconds, None)
+    };
+    (interval $seconds:tt) => {
+        $crate::Task::Interval($seconds, None)
+    };
+    (at $hour:tt : $minute:tt) => {
+        $crate::Task::At(
+            time::Time::from_hms($hour, $minute, 0).unwrap(),
+            None
+        )
+    };
+
+    // 带单个skip条件
+    (wait $seconds:tt, weekday $day:tt) => {
+        $crate::Task::Wait($seconds, Some(vec![$crate::Skip::Day(vec![$day])]))
+    };
+    (wait $seconds:tt, date $year:tt - $month:tt - $day:tt) => {
+        $crate::Task::Wait($seconds, Some(vec![$crate::Skip::Date(
+            time::Date::from_calendar_date($year, time::Month::try_from($month).unwrap(), $day).unwrap()
+        )]))
+    };
+    (wait $seconds:tt, time $start_h:tt : $start_m:tt .. $end_h:tt : $end_m:tt) => {
+        $crate::Task::Wait($seconds, Some(vec![$crate::Skip::TimeRange(
+            time::Time::from_hms($start_h, $start_m, 0).unwrap(),
+            time::Time::from_hms($end_h, $end_m, 0).unwrap()
+        )]))
+    };
+
+    (interval $seconds:tt, weekday $day:tt) => {
+        $crate::Task::Interval($seconds, Some(vec![$crate::Skip::Day(vec![$day])]))
+    };
+    (interval $seconds:tt, date $year:tt - $month:tt - $day:tt) => {
+        $crate::Task::Interval($seconds, Some(vec![$crate::Skip::Date(
+            time::Date::from_calendar_date($year, time::Month::try_from($month).unwrap(), $day).unwrap()
+        )]))
+    };
+    (interval $seconds:tt, time $start_h:tt : $start_m:tt .. $end_h:tt : $end_m:tt) => {
+        $crate::Task::Interval($seconds, Some(vec![$crate::Skip::TimeRange(
+            time::Time::from_hms($start_h, $start_m, 0).unwrap(),
+            time::Time::from_hms($end_h, $end_m, 0).unwrap()
+        )]))
+    };
+
+    (at $hour:tt : $minute:tt, weekday $day:tt) => {
+        $crate::Task::At(
+            time::Time::from_hms($hour, $minute, 0).unwrap(),
+            Some(vec![$crate::Skip::Day(vec![$day])])
+        )
+    };
+    (at $hour:tt : $minute:tt, date $year:tt - $month:tt - $day:tt) => {
+        $crate::Task::At(
+            time::Time::from_hms($hour, $minute, 0).unwrap(),
+            Some(vec![$crate::Skip::Date(
+                time::Date::from_calendar_date($year, time::Month::try_from($month).unwrap(), $day).unwrap()
+            )])
+        )
+    };
+    (at $hour:tt : $minute:tt, time $start_h:tt : $start_m:tt .. $end_h:tt : $end_m:tt) => {
+        $crate::Task::At(
+            time::Time::from_hms($hour, $minute, 0).unwrap(),
+            Some(vec![$crate::Skip::TimeRange(
+                time::Time::from_hms($start_h, $start_m, 0).unwrap(),
+                time::Time::from_hms($end_h, $end_m, 0).unwrap()
+            )])
+        )
+    };
+
+    // 带多个skip条件列表
+    (wait $seconds:tt, [$($skip:tt)*]) => {
+        $crate::Task::Wait($seconds, Some($crate::task!(@build_skips $($skip)*)))
+    };
+    (interval $seconds:tt, [$($skip:tt)*]) => {
+        $crate::Task::Interval($seconds, Some($crate::task!(@build_skips $($skip)*)))
+    };
+    (at $hour:tt : $minute:tt, [$($skip:tt)*]) => {
+        $crate::Task::At(
+            time::Time::from_hms($hour, $minute, 0).unwrap(),
+            Some($crate::task!(@build_skips $($skip)*))
+        )
+    };
+
+    // 辅助宏：构建skip列表
+    (@build_skips) => { vec![] };
+    (@build_skips weekday $day:tt $(, $($rest:tt)*)?) => {
+        {
+            let mut skips = vec![$crate::Skip::Day(vec![$day])];
+            $(skips.extend($crate::task!(@build_skips $($rest)*));)?
+            skips
+        }
+    };
+    (@build_skips date $year:tt - $month:tt - $day:tt $(, $($rest:tt)*)?) => {
+        {
+            let mut skips = vec![$crate::Skip::Date(
+                time::Date::from_calendar_date($year, time::Month::try_from($month).unwrap(), $day).unwrap()
+            )];
+            $(skips.extend($crate::task!(@build_skips $($rest)*));)?
+            skips
+        }
+    };
+    (@build_skips time $start_h:tt : $start_m:tt .. $end_h:tt : $end_m:tt $(, $($rest:tt)*)?) => {
+        {
+            let mut skips = vec![$crate::Skip::TimeRange(
+                time::Time::from_hms($start_h, $start_m, 0).unwrap(),
+                time::Time::from_hms($end_h, $end_m, 0).unwrap()
+            )];
+            $(skips.extend($crate::task!(@build_skips $($rest)*));)?
+            skips
+        }
+    };
+}
+
 impl fmt::Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

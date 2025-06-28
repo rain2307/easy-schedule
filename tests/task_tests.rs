@@ -1,4 +1,4 @@
-use easy_schedule::prelude::*;
+use easy_schedule::{prelude::*, task};
 use time::{
     OffsetDateTime,
     macros::{offset, time},
@@ -152,4 +152,55 @@ fn test_task_debug() {
 
     assert!(debug_str.contains("Wait"));
     assert!(debug_str.contains("10"));
+}
+
+#[test]
+fn test_task_macro_basic() {
+    let wait_task = task!(wait 10);
+    assert_eq!(wait_task, Task::Wait(10, None));
+
+    let interval_task = task!(interval 60);
+    assert_eq!(interval_task, Task::Interval(60, None));
+
+    let at_task = task!(at 9:30);
+    assert_eq!(at_task, Task::At(time!(9:30:00), None));
+}
+
+#[test]
+fn test_task_macro_single_skip() {
+    let wait_with_weekday = task!(wait 10, weekday 1);
+    assert_eq!(wait_with_weekday, Task::Wait(10, Some(vec![Skip::Day(vec![1])])));
+
+    let interval_with_date = task!(interval 60, date 2024-12-25);
+    assert_eq!(interval_with_date, Task::Interval(60, Some(vec![Skip::Date(
+        time::Date::from_calendar_date(2024, time::Month::December, 25).unwrap()
+    )])));
+
+    let at_with_time = task!(at 9:30, time 12:00..13:00);
+    assert_eq!(at_with_time, Task::At(
+        time::Time::from_hms(9, 30, 0).unwrap(),
+        Some(vec![Skip::TimeRange(
+            time::Time::from_hms(12, 0, 0).unwrap(),
+            time::Time::from_hms(13, 0, 0).unwrap()
+        )])
+    ));
+}
+
+#[test]
+fn test_task_macro_multiple_skips() {
+    let wait_multi = task!(wait 10, [weekday 1, date 2024-12-25]);
+    assert_eq!(wait_multi, Task::Wait(10, Some(vec![
+        Skip::Day(vec![1]),
+        Skip::Date(time::Date::from_calendar_date(2024, time::Month::December, 25).unwrap())
+    ])));
+
+    let interval_multi = task!(interval 60, [time 12:00..13:00, weekday 6, weekday 7]);
+    assert_eq!(interval_multi, Task::Interval(60, Some(vec![
+        Skip::TimeRange(
+            time::Time::from_hms(12, 0, 0).unwrap(),
+            time::Time::from_hms(13, 0, 0).unwrap()
+        ),
+        Skip::Day(vec![6]),
+        Skip::Day(vec![7])
+    ])));
 }
