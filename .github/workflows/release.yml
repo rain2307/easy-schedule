@@ -46,13 +46,11 @@ jobs:
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - name: Release Please
-        uses: google-github-actions/release-please-action@v4
+        uses: googleapis/release-please-action@v4
         id: release
         with:
-          release-type: rust
-          package-name: easy-schedule
-          skip-github-release: false
-          include-component-in-tag: false
+          config-file: .release-please-config.json
+          manifest-file: .release-please-manifest.json
 
   publish:
     name: Publish to crates.io
