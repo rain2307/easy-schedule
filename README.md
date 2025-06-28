@@ -162,23 +162,23 @@ let custom_scheduler = Scheduler::with_timezone_minutes(330); // UTC+5:30
 
 ## 📋 Task Types Reference
 
-| Type | Description | Example |
-|------|-------------|---------|
-| `Wait(seconds, skip)` | Execute once after delay | `Task::Wait(30, None)` |
-| `Interval(seconds, skip)` | Execute repeatedly | `Task::Interval(60, None)` |  
-| `At(time, skip)` | Execute daily at time | `Task::At(time!(14:30), None)` |
-| `Once(datetime, skip)` | Execute at exact datetime | `Task::Once(datetime, None)` |
+| Type                      | Description               | Example                        |
+| ------------------------- | ------------------------- | ------------------------------ |
+| `Wait(seconds, skip)`     | Execute once after delay  | `Task::Wait(30, None)`         |
+| `Interval(seconds, skip)` | Execute repeatedly        | `Task::Interval(60, None)`     |
+| `At(time, skip)`          | Execute daily at time     | `Task::At(time!(14:30), None)` |
+| `Once(datetime, skip)`    | Execute at exact datetime | `Task::Once(datetime, None)`   |
 
 ## 🚫 Skip Rules Reference
 
-| Skip Type | Description | Example |
-|-----------|-------------|---------|
-| `Date(date)` | Skip specific date | `Skip::Date(date!(2024-12-25))` |
-| `DateRange(start, end)` | Skip date range | `Skip::DateRange(start, end)` |
-| `Day(weekdays)` | Skip weekdays (1=Mon, 7=Sun) | `Skip::Day(vec![6, 7])` |
-| `DayRange(start, end)` | Skip weekday range | `Skip::DayRange(1, 5)` |
-| `Time(time)` | Skip specific time | `Skip::Time(time!(12:00))` |
-| `TimeRange(start, end)` | Skip time range | `Skip::TimeRange(time!(22:00), time!(06:00))` |
+| Skip Type               | Description                  | Example                                       |
+| ----------------------- | ---------------------------- | --------------------------------------------- |
+| `Date(date)`            | Skip specific date           | `Skip::Date(date!(2024-12-25))`               |
+| `DateRange(start, end)` | Skip date range              | `Skip::DateRange(start, end)`                 |
+| `Day(weekdays)`         | Skip weekdays (1=Mon, 7=Sun) | `Skip::Day(vec![6, 7])`                       |
+| `DayRange(start, end)`  | Skip weekday range           | `Skip::DayRange(1, 5)`                        |
+| `Time(time)`            | Skip specific time           | `Skip::Time(time!(12:00))`                    |
+| `TimeRange(start, end)` | Skip time range              | `Skip::TimeRange(time!(22:00), time!(06:00))` |
 
 ## 🛠️ Advanced Usage
 
@@ -243,9 +243,5 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📄 License
 
-This project is licensed under either of
-
 - Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
 - MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
-
-at your option.
