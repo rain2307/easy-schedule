@@ -41,11 +41,15 @@ jobs:
       - name: Run tests
         run: cargo test --verbose
 
-      - name: Run examples
+      - name: Run examples (Unix)
+        if: runner.os != 'Windows'
         run: |
-          cargo run --example basic &
-          sleep 5
-          pkill -f "cargo run --example basic" || true
+          timeout 5s cargo run --example basic || true
+          
+      - name: Run examples (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Start-Process -FilePath "cargo" -ArgumentList "run", "--example", "basic" -PassThru | ForEach-Object { Start-Sleep -Seconds 5; Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
 
   lint:
     name: Lint
