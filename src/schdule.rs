@@ -31,6 +31,12 @@ pub struct Scheduler {
     timezone_minutes: i16,
 }
 
+impl Default for Scheduler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Scheduler {
     /// create a new scheduler with default timezone (+8)
     pub fn new() -> Self {
@@ -91,7 +97,7 @@ impl Scheduler {
 fn get_next_time(now: OffsetDateTime, time: Time) -> OffsetDateTime {
     let mut next = now.replace_time(time);
     if next < now {
-        next = next + time::Duration::days(1);
+        next += time::Duration::days(1);
     }
     next
 }

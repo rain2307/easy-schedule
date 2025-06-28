@@ -7,10 +7,9 @@ fn print_time(name: &str) {
     let now = OffsetDateTime::now_utc().to_offset(offset!(+8));
     let format = time::macros::format_description!("[hour]:[minute]:[second]");
     println!(
-        "[{}] {}: {}",
+        "[{}] {}: executed",
         now.format(&format).unwrap(),
-        name,
-        "executed"
+        name
     );
 }
 
