@@ -138,9 +138,9 @@ impl Task {
                 Ok(Task::Wait(seconds, None))
             }
             "interval" => {
-                let seconds = args.parse::<u64>().map_err(|_| {
-                    format!("Invalid seconds value '{args}' in interval({args})")
-                })?;
+                let seconds = args
+                    .parse::<u64>()
+                    .map_err(|_| format!("Invalid seconds value '{args}' in interval({args})"))?;
                 Ok(Task::Interval(seconds, None))
             }
             "at" => {
@@ -158,7 +158,9 @@ impl Task {
                     .map_err(|_| format!("Invalid datetime format '{args}' in once({args}). Expected format: YYYY-MM-DD HH:MM:SS +HH"))?;
                 Ok(Task::Once(datetime, None))
             }
-            _ => Err(format!("Unknown task type '{function_name}'. Supported types: wait, interval, at, once")),
+            _ => Err(format!(
+                "Unknown task type '{function_name}'. Supported types: wait, interval, at, once"
+            )),
         }
     }
 }
