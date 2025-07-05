@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.3](https://github.com/rain2307/easy-schedule/compare/easy-schedule-v0.11.2...easy-schedule-v0.11.3) (2025-07-05)
+
+
+### ✨ Features
+
+* add next time ([6c3b914](https://github.com/rain2307/easy-schedule/commit/6c3b914f2857ac0653e685d76dddc25f8713b057))
+
+
+### 🐛 Bug Fixes
+
+* clippy ([b5ce2e7](https://github.com/rain2307/easy-schedule/commit/b5ce2e7b032298ce5f88d4878a661caf698abc00))
+
 ## [0.11.2](https://github.com/rain2307/easy-schedule/compare/easy-schedule-v0.11.1...easy-schedule-v0.11.2) (2025-07-05)
 
 
