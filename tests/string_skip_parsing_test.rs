@@ -92,8 +92,8 @@ fn test_parsing_display() {
 
     for test in tests {
         let task = Task::parse(test).unwrap();
-        let display = format!("{}", task);
-        println!("Parsed '{}' -> '{}'", test, display);
+        let display = format!("{task}");
+        println!("Parsed '{test}' -> '{display}'");
         // Just ensure it doesn't panic
         assert!(!display.is_empty());
     }
