@@ -228,31 +228,28 @@ impl Task {
             "weekday" => {
                 if parts.len() != 2 {
                     return Err(format!(
-                        "Invalid weekday format: '{}'. Expected 'weekday N'",
-                        skip_str
+                        "Invalid weekday format: '{skip_str}'. Expected 'weekday N'"
                     ));
                 }
                 let day = parts[1]
                     .parse::<u8>()
                     .map_err(|_| format!("Invalid weekday number: '{}'", parts[1]))?;
-                if day < 1 || day > 7 {
-                    return Err(format!("Weekday must be between 1-7, got: {}", day));
+                if !(1..=7).contains(&day) {
+                    return Err(format!("Weekday must be between 1-7, got: {day}"));
                 }
                 Ok(Skip::Day(vec![day]))
             }
             "date" => {
                 if parts.len() != 2 {
                     return Err(format!(
-                        "Invalid date format: '{}'. Expected 'date YYYY-MM-DD'",
-                        skip_str
+                        "Invalid date format: '{skip_str}'. Expected 'date YYYY-MM-DD'"
                     ));
                 }
                 let date_str = parts[1];
                 let date_parts: Vec<&str> = date_str.split('-').collect();
                 if date_parts.len() != 3 {
                     return Err(format!(
-                        "Invalid date format: '{}'. Expected 'YYYY-MM-DD'",
-                        date_str
+                        "Invalid date format: '{date_str}'. Expected 'YYYY-MM-DD'"
                     ));
                 }
 
@@ -267,17 +264,16 @@ impl Task {
                     .map_err(|_| format!("Invalid day: '{}'", date_parts[2]))?;
 
                 let month_enum = time::Month::try_from(month)
-                    .map_err(|_| format!("Invalid month: {}", month))?;
+                    .map_err(|_| format!("Invalid month: {month}"))?;
                 let date = time::Date::from_calendar_date(year, month_enum, day)
-                    .map_err(|_| format!("Invalid date: {}-{}-{}", year, month, day))?;
+                    .map_err(|_| format!("Invalid date: {year}-{month}-{day}"))?;
 
                 Ok(Skip::Date(date))
             }
             "time" => {
                 if parts.len() != 2 {
                     return Err(format!(
-                        "Invalid time format: '{}'. Expected 'time HH:MM..HH:MM'",
-                        skip_str
+                        "Invalid time format: '{skip_str}'. Expected 'time HH:MM..HH:MM'"
                     ));
                 }
                 let time_range = parts[1];
@@ -287,16 +283,16 @@ impl Task {
 
                     let format = format_description!("[hour]:[minute]");
                     let start_time = Time::parse(start_str, &format)
-                        .map_err(|_| format!("Invalid start time: '{}'", start_str))?;
+                        .map_err(|_| format!("Invalid start time: '{start_str}'"))?;
                     let end_time = Time::parse(end_str, &format)
-                        .map_err(|_| format!("Invalid end time: '{}'", end_str))?;
+                        .map_err(|_| format!("Invalid end time: '{end_str}'"))?;
 
                     Ok(Skip::TimeRange(start_time, end_time))
                 } else {
                     // Single time
                     let format = format_description!("[hour]:[minute]");
                     let time = Time::parse(time_range, &format)
-                        .map_err(|_| format!("Invalid time: '{}'", time_range))?;
+                        .map_err(|_| format!("Invalid time: '{time_range}'"))?;
                     Ok(Skip::Time(time))
                 }
             }
