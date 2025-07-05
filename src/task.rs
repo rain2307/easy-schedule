@@ -263,8 +263,8 @@ impl Task {
                     .parse::<u8>()
                     .map_err(|_| format!("Invalid day: '{}'", date_parts[2]))?;
 
-                let month_enum = time::Month::try_from(month)
-                    .map_err(|_| format!("Invalid month: {month}"))?;
+                let month_enum =
+                    time::Month::try_from(month).map_err(|_| format!("Invalid month: {month}"))?;
                 let date = time::Date::from_calendar_date(year, month_enum, day)
                     .map_err(|_| format!("Invalid date: {year}-{month}-{day}"))?;
 
