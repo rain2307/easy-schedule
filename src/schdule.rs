@@ -1,30 +1,9 @@
-use crate::task::Task;
-use async_trait::async_trait;
-use std::fmt::Debug;
-use time::{OffsetDateTime, Time, UtcOffset};
+use crate::task::{Notifiable, Task, get_next_time, get_now};
+use time::OffsetDateTime;
 use tokio::select;
 use tokio::time::{Duration, Instant, sleep, sleep_until};
 use tokio_util::sync::CancellationToken;
 use tracing::instrument;
-
-/// a task that can be scheduled
-#[async_trait]
-pub trait Notifiable: Sync + Send + Debug {
-    /// get the schedule type
-    fn get_schedule(&self) -> Task;
-
-    /// called when the task is scheduled
-    ///
-    /// Default cancel on first trigger
-    async fn on_time(&self, cancel: CancellationToken) {
-        cancel.cancel();
-    }
-
-    /// called when the task is skipped
-    async fn on_skip(&self, _cancel: CancellationToken) {
-        // do nothing
-    }
-}
 
 pub struct Scheduler {
     cancel: CancellationToken,
@@ -61,7 +40,7 @@ impl Scheduler {
 
     /// run the task
     pub async fn run<T: Notifiable + 'static>(&self, task: T) {
-        let schedule = task.get_schedule();
+        let schedule = task.get_task();
         let cancel = self.cancel.clone();
         let timezone_minutes = self.timezone_minutes;
 
@@ -81,6 +60,11 @@ impl Scheduler {
         }
     }
 
+    pub fn get_next_run_time<T: Notifiable + 'static>(&self, task: T) -> Option<OffsetDateTime> {
+        let schedule = task.get_task();
+        schedule.get_next_run_time::<T>(self.timezone_minutes)
+    }
+
     /// stop the scheduler
     ///
     /// this will cancel all the tasks
@@ -94,21 +78,6 @@ impl Scheduler {
     }
 }
 
-fn get_next_time(now: OffsetDateTime, time: Time) -> OffsetDateTime {
-    let mut next = now.replace_time(time);
-    if next < now {
-        next += time::Duration::days(1);
-    }
-    next
-}
-
-fn get_now(timezone_minutes: i16) -> Result<OffsetDateTime, time::error::ComponentRange> {
-    let hours = timezone_minutes / 60;
-    let minutes = timezone_minutes % 60;
-    let offset = UtcOffset::from_hms(hours as i8, minutes as i8, 0)?;
-    Ok(OffsetDateTime::now_utc().to_offset(offset))
-}
-
 impl Scheduler {
     /// run wait task
     #[instrument(skip(cancel))]
@@ -117,7 +86,7 @@ impl Scheduler {
         cancel: CancellationToken,
         timezone_minutes: i16,
     ) {
-        if let Task::Wait(wait, skip) = task.get_schedule() {
+        if let Task::Wait(wait, skip) = task.get_task() {
             let task_ref = task;
             tokio::task::spawn(async move {
                 select! {
@@ -147,7 +116,7 @@ impl Scheduler {
         cancel: CancellationToken,
         timezone_minutes: i16,
     ) {
-        if let Task::Interval(interval, skip) = task.get_schedule() {
+        if let Task::Interval(interval, skip) = task.get_task() {
             let task_ref = task;
             tokio::task::spawn(async move {
                 loop {
@@ -180,7 +149,7 @@ impl Scheduler {
         cancel: CancellationToken,
         timezone_minutes: i16,
     ) {
-        if let Task::At(time, skip) = task.get_schedule() {
+        if let Task::At(time, skip) = task.get_task() {
             let task_ref = task;
             tokio::task::spawn(async move {
                 let now = get_now(timezone_minutes).unwrap_or_else(|_| OffsetDateTime::now_utc());
@@ -222,7 +191,7 @@ impl Scheduler {
         cancel: CancellationToken,
         timezone_minutes: i16,
     ) {
-        if let Task::Once(next, skip) = task.get_schedule() {
+        if let Task::Once(next, skip) = task.get_task() {
             let task_ref = task;
             tokio::task::spawn(async move {
                 let now = get_now(timezone_minutes).unwrap_or_else(|_| OffsetDateTime::now_utc());

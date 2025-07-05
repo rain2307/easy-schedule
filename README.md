@@ -24,6 +24,7 @@ A flexible and powerful task scheduler built on Tokio, providing multiple schedu
 - **Timezone Support** - Full timezone support with minute-level precision
 - **String Parsing** - Create tasks from intuitive strings like `wait(5)`, `at(14:30)`
 - **Cancellation** - Comprehensive task cancellation support
+- **Next Run Time** - Query when tasks will next execute
 - **Error Handling** - Robust error handling with sensible defaults
 - **Async/Await** - Full async support with Tokio integration
 
@@ -33,14 +34,14 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-easy-schedule = "0.10"
+easy-schedule = "0.11"
 tokio = { version = "1", features = ["full"] }
 time = { version = "0.3", features = ["macros"] }
 ```
 
-## 📖 Usage Examples
+## 📖 Usage
 
-### Basic Task Types
+### Basic Setup
 
 ```rust
 use easy_schedule::prelude::*;
@@ -53,17 +54,8 @@ struct MyTask {
 
 #[async_trait]
 impl Notifiable for MyTask {
-    fn get_schedule(&self) -> Task {
-        match self.name.as_str() {
-            "wait" => Task::Wait(5, None),                    // Wait 5 seconds
-            "interval" => Task::Interval(10, None),           // Every 10 seconds
-            "daily" => Task::At(Time::from_hms(9, 0, 0).unwrap(), None), // Daily at 9:00 AM
-            "once" => {
-                let future = OffsetDateTime::now_utc() + time::Duration::minutes(5);
-                Task::Once(future, None)                      // Once, 5 minutes from now
-            }
-            _ => Task::Wait(1, None),
-        }
+    fn get_task(&self) -> Task {
+        Task::Wait(5, None) // Wait 5 seconds
     }
 
     async fn on_time(&self, cancel: CancellationToken) {
@@ -76,72 +68,75 @@ impl Notifiable for MyTask {
 async fn main() {
     let scheduler = Scheduler::new();
     
-    scheduler.run(MyTask { name: "wait".to_string() }).await;
-    scheduler.run(MyTask { name: "interval".to_string() }).await;
+    scheduler.run(MyTask { name: "my_task".to_string() }).await;
     
-    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
     scheduler.stop();
 }
+```
+
+### Task Types
+
+```rust
+use easy_schedule::prelude::*;
+use time::{Time, macros::time};
+
+// Wait 30 seconds then execute once
+let wait_task = Task::Wait(30, None);
+let scheduler = Scheduler::new();
+
+// Execute every 60 seconds
+let interval_task = Task::Interval(60, None);
+let scheduler = Scheduler::new();
+
+// Execute daily at 9:00 AM
+let at_task = Task::At(time!(09:00), None);
+let scheduler = Scheduler::new();
+
+// Execute once at specific datetime
+let future = OffsetDateTime::now_utc() + time::Duration::minutes(5);
+let once_task = Task::Once(future, None);
+let scheduler = Scheduler::new();
 ```
 
 ### Skip Conditions
 
 ```rust
 use easy_schedule::prelude::*;
-use time::{Time, macros::time};
+use time::macros::time;
 
-#[derive(Debug)]
-struct BusinessHoursTask;
+let skip_rules = vec![
+    Skip::Day(vec![6, 7]),                           // Skip weekends
+    Skip::TimeRange(time!(22:00), time!(06:00)),     // Skip night hours
+    Skip::Time(time!(12:00)),                        // Skip lunch time
+];
 
-#[async_trait]
-impl Notifiable for BusinessHoursTask {
-    fn get_schedule(&self) -> Task {
-        let skip_rules = vec![
-            Skip::Day(vec![6, 7]),                           // Skip weekends
-            Skip::TimeRange(                                 // Skip night hours
-                time!(22:00), 
-                time!(06:00)
-            ),
-            Skip::Time(time!(12:00)),                        // Skip lunch time
-        ];
-        
-        Task::Interval(3600, Some(skip_rules))              // Every hour, with skips
-    }
-
-    async fn on_time(&self, _cancel: CancellationToken) {
-        println!("Business hours task executed!");
-    }
-
-    async fn on_skip(&self, _cancel: CancellationToken) {
-        println!("Skipped execution (outside business hours)");
-    }
-}
+let task = Task::Interval(3600, Some(skip_rules));  // Every hour, with skips
+let scheduler = Scheduler::new();
 ```
 
-### String Parsing
+### Next Run Time
 
 ```rust
 use easy_schedule::prelude::*;
 
-// ✅ Safe parsing with error handling
-match Task::parse("wait(30)") {
-    Ok(task) => println!("Task created: {}", task),
-    Err(err) => println!("Parse error: {}", err),
+let task = Task::Interval(60, None);
+let scheduler = Scheduler::new();
+
+// Create a test task that implements Notifiable
+struct TestTask(Task);
+
+#[async_trait]
+impl Notifiable for TestTask {
+    fn get_task(&self) -> Task { self.0.clone() }
+    async fn on_time(&self, _cancel: CancellationToken) {}
 }
 
-// ⚠️ Direct parsing (panics on error)
-let task = Task::from("wait(30)");                          // Wait 30 seconds
-
-// Multiple tasks with error handling
-let task_strings = vec!["wait(30)", "interval(60)", "at(14:30)"];
-let tasks: Result<Vec<Task>, String> = task_strings
-    .iter()
-    .map(|s| Task::parse(s))
-    .collect();
-
-match tasks {
-    Ok(tasks) => println!("All tasks parsed successfully: {} tasks", tasks.len()),
-    Err(err) => println!("Parse failed: {}", err),
+let test_task = TestTask(task);
+if let Some(next_time) = scheduler.get_next_run_time(test_task) {
+    println!("Next execution: {}", next_time);
+} else {
+    println!("Task will not run (likely skipped)");
 }
 ```
 
@@ -154,7 +149,6 @@ use easy_schedule::prelude::*;
 let utc_scheduler = Scheduler::with_timezone(0, 0);         // UTC
 let tokyo_scheduler = Scheduler::with_timezone(9, 0);       // JST
 let india_scheduler = Scheduler::with_timezone(5, 30);      // IST
-let ny_scheduler = Scheduler::with_timezone(-5, 0);         // EST
 
 // Or use minute offsets directly
 let custom_scheduler = Scheduler::with_timezone_minutes(330); // UTC+5:30
@@ -205,17 +199,8 @@ let complex_skips = vec![
     Skip::Date(date!(2024-12-25)),            // No Christmas
 ];
 
-Task::Interval(1800, Some(complex_skips))     // Every 30 minutes with conditions
+let task = Task::Interval(1800, Some(complex_skips));     // Every 30 minutes with conditions
 ```
-
-## 🏗️ Architecture
-
-The library follows a clean separation of concerns:
-
-- **`Task`** - Defines when to execute (Wait, Interval, At, Once)
-- **`Skip`** - Defines when NOT to execute (dates, times, weekdays)
-- **`Notifiable`** - Your business logic (what to execute)
-- **`Scheduler`** - Orchestrates everything with timezone support
 
 ## 🧪 Testing
 
@@ -225,21 +210,7 @@ Run the comprehensive test suite:
 cargo test                    # Run all tests
 cargo test --test skip_tests  # Test skip functionality
 cargo test --test task_tests  # Test task parsing
-cargo run --example basic     # Run basic example
 ```
-
-## 📚 Examples
-
-Check out the `examples/` directory for complete working examples:
-
-- `basic.rs` - Basic scheduling with all task types
-- `skip_example.rs` - Advanced skip conditions
-- `string_parsing.rs` - String-based task creation
-- `error_handling.rs` - Robust error handling patterns
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📄 License
 

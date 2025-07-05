@@ -1,5 +1,26 @@
-use std::fmt::{self, Debug};
-use time::{Date, OffsetDateTime, Time, macros::format_description};
+use async_trait::async_trait;
+use std::fmt::Debug;
+use time::{Date, OffsetDateTime, Time, UtcOffset, macros::format_description};
+use tokio_util::sync::CancellationToken;
+
+/// a task that can be scheduled
+#[async_trait]
+pub trait Notifiable: Sync + Send + Debug {
+    /// get the schedule type
+    fn get_task(&self) -> Task;
+
+    /// called when the task is scheduled
+    ///
+    /// Default cancel on first trigger
+    async fn on_time(&self, cancel: CancellationToken) {
+        cancel.cancel();
+    }
+
+    /// called when the task is skipped
+    async fn on_skip(&self, _cancel: CancellationToken) {
+        // do nothing
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Skip {
@@ -31,8 +52,8 @@ impl Default for Skip {
     }
 }
 
-impl fmt::Display for Skip {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Display for Skip {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Skip::Date(date) => write!(f, "date: {date}"),
             Skip::DateRange(start, end) => write!(f, "date range: {start} - {end}"),
@@ -92,6 +113,92 @@ impl PartialEq for Task {
             (Task::At(a, skip_a), Task::At(b, skip_b)) => a == b && skip_a == skip_b,
             (Task::Once(a, skip_a), Task::Once(b, skip_b)) => a == b && skip_a == skip_b,
             _ => false,
+        }
+    }
+}
+
+impl Task {
+    /// get the next run time for the scheduled task
+    pub fn get_next_run_time<T: Notifiable + 'static>(
+        &self,
+        timezone_minutes: i16,
+    ) -> Option<OffsetDateTime> {
+        let now = get_now(timezone_minutes).unwrap_or_else(|_| OffsetDateTime::now_utc());
+
+        match self.clone() {
+            Task::Wait(wait, skip) => {
+                let mut next_time = now + time::Duration::seconds(wait as i64);
+
+                if let Some(skip_rules) = skip {
+                    let mut attempts = 0;
+                    const MAX_ATTEMPTS: u32 = 1000;
+
+                    while skip_rules.iter().any(|s| s.is_skip(next_time)) && attempts < MAX_ATTEMPTS
+                    {
+                        next_time += time::Duration::seconds(wait as i64);
+                        attempts += 1;
+                    }
+
+                    if attempts >= MAX_ATTEMPTS {
+                        return None;
+                    }
+                }
+
+                Some(next_time)
+            }
+            Task::Interval(interval, skip) => {
+                let mut next_time = now + time::Duration::seconds(interval as i64);
+
+                if let Some(skip_rules) = skip {
+                    let mut attempts = 0;
+                    const MAX_ATTEMPTS: u32 = 1000;
+
+                    while skip_rules.iter().any(|s| s.is_skip(next_time)) && attempts < MAX_ATTEMPTS
+                    {
+                        next_time += time::Duration::seconds(interval as i64);
+                        attempts += 1;
+                    }
+
+                    if attempts >= MAX_ATTEMPTS {
+                        return None;
+                    }
+                }
+
+                Some(next_time)
+            }
+            Task::At(time, skip) => {
+                let mut next_time = get_next_time(now, time);
+
+                if let Some(skip_rules) = skip {
+                    let mut attempts = 0;
+                    const MAX_ATTEMPTS: u32 = 365;
+
+                    while skip_rules.iter().any(|s| s.is_skip(next_time)) && attempts < MAX_ATTEMPTS
+                    {
+                        next_time += time::Duration::days(1);
+                        attempts += 1;
+                    }
+
+                    if attempts >= MAX_ATTEMPTS {
+                        return None;
+                    }
+                }
+
+                Some(next_time)
+            }
+            Task::Once(once_time, skip) => {
+                if once_time <= now {
+                    return None;
+                }
+
+                if let Some(skip_rules) = skip {
+                    if skip_rules.iter().any(|s| s.is_skip(once_time)) {
+                        return None;
+                    }
+                }
+
+                Some(once_time)
+            }
         }
     }
 }
@@ -446,8 +553,8 @@ macro_rules! task {
     };
 }
 
-impl fmt::Display for Task {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Display for Task {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Task::Wait(wait, skip) => {
                 let skip = skip
@@ -491,4 +598,19 @@ impl fmt::Display for Task {
             }
         }
     }
+}
+
+pub fn get_next_time(now: OffsetDateTime, time: Time) -> OffsetDateTime {
+    let mut next = now.replace_time(time);
+    if next < now {
+        next += time::Duration::days(1);
+    }
+    next
+}
+
+pub fn get_now(timezone_minutes: i16) -> Result<OffsetDateTime, time::error::ComponentRange> {
+    let hours = timezone_minutes / 60;
+    let minutes = timezone_minutes % 60;
+    let offset = UtcOffset::from_hms(hours as i8, minutes as i8, 0)?;
+    Ok(OffsetDateTime::now_utc().to_offset(offset))
 }

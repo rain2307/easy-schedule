@@ -50,7 +50,7 @@ impl TestTask {
 
 #[async_trait]
 impl Notifiable for TestTask {
-    fn get_schedule(&self) -> Task {
+    fn get_task(&self) -> Task {
         self.task.clone()
     }
 
@@ -223,4 +223,112 @@ async fn test_at_task_skip_logic() {
     // Since we skip all days, it should not execute but should skip
     assert_eq!(task.execution_count(), 0);
     assert!(task.skip_count() > 0);
+}
+
+#[tokio::test]
+async fn test_get_next_run_time_wait() {
+    let task = Task::Wait(60, None);
+    let scheduler = Scheduler::new();
+
+    let test_task = TestTask::new(task);
+    let next_time = scheduler.get_next_run_time(test_task);
+    assert!(next_time.is_some());
+
+    let now = OffsetDateTime::now_utc().to_offset(time::macros::offset!(+8));
+    let expected_next = now + time::Duration::seconds(60);
+    let diff = (next_time.unwrap() - expected_next).abs();
+
+    // Allow for small timing differences
+    assert!(diff < time::Duration::seconds(2));
+}
+
+#[tokio::test]
+async fn test_get_next_run_time_interval() {
+    let task = Task::Interval(30, None);
+    let scheduler = Scheduler::new();
+
+    let test_task = TestTask::new(task);
+    let next_time = scheduler.get_next_run_time(test_task);
+    assert!(next_time.is_some());
+
+    let now = OffsetDateTime::now_utc().to_offset(time::macros::offset!(+8));
+    let expected_next = now + time::Duration::seconds(30);
+    let diff = (next_time.unwrap() - expected_next).abs();
+
+    // Allow for small timing differences
+    assert!(diff < time::Duration::seconds(2));
+}
+
+#[tokio::test]
+async fn test_get_next_run_time_at() {
+    let test_time = time::Time::from_hms(14, 30, 0).unwrap();
+    let task = Task::At(test_time, None);
+    let scheduler = Scheduler::new();
+
+    let test_task = TestTask::new(task);
+    let next_time = scheduler.get_next_run_time(test_task);
+    assert!(next_time.is_some());
+
+    let next = next_time.unwrap();
+    assert_eq!(next.time(), test_time);
+
+    let now = OffsetDateTime::now_utc().to_offset(time::macros::offset!(+8));
+    if next.date() == now.date() {
+        // If today, should be later than now
+        assert!(next > now);
+    } else {
+        // If tomorrow, should be tomorrow
+        assert_eq!(next.date(), now.date() + time::Duration::days(1));
+    }
+}
+
+#[tokio::test]
+async fn test_get_next_run_time_once_future() {
+    let now = OffsetDateTime::now_utc().to_offset(time::macros::offset!(+8));
+    let future_time = now + time::Duration::seconds(120);
+    let task = Task::Once(future_time, None);
+    let scheduler = Scheduler::new();
+
+    let test_task = TestTask::new(task);
+    let next_time = scheduler.get_next_run_time(test_task);
+    assert!(next_time.is_some());
+    assert_eq!(next_time.unwrap(), future_time);
+}
+
+#[tokio::test]
+async fn test_get_next_run_time_once_past() {
+    let now = OffsetDateTime::now_utc().to_offset(time::macros::offset!(+8));
+    let past_time = now - time::Duration::seconds(60);
+    let task = Task::Once(past_time, None);
+    let scheduler = Scheduler::new();
+
+    let test_task = TestTask::new(task);
+    let next_time = scheduler.get_next_run_time(test_task);
+    assert!(next_time.is_none());
+}
+
+#[tokio::test]
+async fn test_get_next_run_time_with_skip() {
+    let skip = Some(vec![Skip::Day(vec![1, 2, 3, 4, 5, 6, 7])]); // Skip all days
+    let task = Task::Interval(5, skip);
+    let scheduler = Scheduler::new();
+
+    let test_task = TestTask::new(task);
+    let next_time = scheduler.get_next_run_time(test_task);
+    // Should return None when all days are skipped
+    assert!(next_time.is_none());
+}
+
+#[tokio::test]
+async fn test_get_next_run_time_once_with_skip() {
+    let now = OffsetDateTime::now_utc().to_offset(time::macros::offset!(+8));
+    let future_time = now + time::Duration::seconds(60);
+    let skip = Some(vec![Skip::Day(vec![1, 2, 3, 4, 5, 6, 7])]); // Skip all days
+    let task = Task::Once(future_time, skip);
+    let scheduler = Scheduler::new();
+
+    let test_task = TestTask::new(task);
+    let next_time = scheduler.get_next_run_time(test_task);
+    // Should return None because the once task is skipped
+    assert!(next_time.is_none());
 }
