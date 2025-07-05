@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.11.2](https://github.com/rain2307/easy-schedule/compare/easy-schedule-v0.11.1...easy-schedule-v0.11.2) (2025-07-05)
+
+
+### 🐛 Bug Fixes
+
+* clippy ([a48e2b0](https://github.com/rain2307/easy-schedule/commit/a48e2b0a22c95c68b58691197377f81dfc943882))
+* clippy ([c33a754](https://github.com/rain2307/easy-schedule/commit/c33a754f7964285e11d65906f0f76edbef085a62))
+* format ([b0d9fc4](https://github.com/rain2307/easy-schedule/commit/b0d9fc46adb305772c1dfd8aa82a137f8be4054f))
+* format ([eb9ecc7](https://github.com/rain2307/easy-schedule/commit/eb9ecc7e854b800f46a33989096a78dfd94dd6b6))
+* format ([dd8e531](https://github.com/rain2307/easy-schedule/commit/dd8e531f3bf4c4657ac82345eb49636306eda11f))
+* format ([e24a8eb](https://github.com/rain2307/easy-schedule/commit/e24a8eb67ace768ad97edfe20e4e074566d1c821))
+* format ([f4ad728](https://github.com/rain2307/easy-schedule/commit/f4ad728add400cc4e8329720ac4d0503a054dc83))
+* string skip ([d2758f6](https://github.com/rain2307/easy-schedule/commit/d2758f6d32493e1a5b7e635589590cad01566c07))
+* string skip ([129daef](https://github.com/rain2307/easy-schedule/commit/129daefc16f0c63f18e38ee9626f7463ad31af59))
+
 ## [0.11.1](https://github.com/rain2307/easy-schedule/compare/easy-schedule-v0.11.0...easy-schedule-v0.11.1) (2025-06-28)
 
 
