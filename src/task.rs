@@ -135,15 +135,15 @@ impl Task {
 
         match function_name {
             "wait" => {
-                let seconds = primary_arg
-                    .parse::<u64>()
-                    .map_err(|_| format!("Invalid seconds value '{primary_arg}' in wait({primary_arg})"))?;
+                let seconds = primary_arg.parse::<u64>().map_err(|_| {
+                    format!("Invalid seconds value '{primary_arg}' in wait({primary_arg})")
+                })?;
                 Ok(Task::Wait(seconds, skip_conditions))
             }
             "interval" => {
-                let seconds = primary_arg
-                    .parse::<u64>()
-                    .map_err(|_| format!("Invalid seconds value '{primary_arg}' in interval({primary_arg})"))?;
+                let seconds = primary_arg.parse::<u64>().map_err(|_| {
+                    format!("Invalid seconds value '{primary_arg}' in interval({primary_arg})")
+                })?;
                 Ok(Task::Interval(seconds, skip_conditions))
             }
             "at" => {
@@ -169,12 +169,12 @@ impl Task {
 
     fn parse_arguments(args: &str) -> Result<(String, Option<Vec<Skip>>), String> {
         let args = args.trim();
-        
+
         // Check if there's a comma, indicating skip conditions
         if let Some(comma_pos) = args.find(',') {
             let primary_arg = args[..comma_pos].trim().to_string();
             let skip_part = args[comma_pos + 1..].trim();
-            
+
             let skip_conditions = Self::parse_skip_conditions(skip_part)?;
             Ok((primary_arg, Some(skip_conditions)))
         } else {
@@ -184,10 +184,10 @@ impl Task {
 
     fn parse_skip_conditions(skip_str: &str) -> Result<Vec<Skip>, String> {
         let skip_str = skip_str.trim();
-        
+
         // Check if it's a list format [...]
         if skip_str.starts_with('[') && skip_str.ends_with(']') {
-            let list_content = &skip_str[1..skip_str.len()-1];
+            let list_content = &skip_str[1..skip_str.len() - 1];
             Self::parse_skip_list(list_content)
         } else {
             // Single skip condition
@@ -199,11 +199,11 @@ impl Task {
     fn parse_skip_list(list_str: &str) -> Result<Vec<Skip>, String> {
         let mut skips = Vec::new();
         let list_str = list_str.trim();
-        
+
         if list_str.is_empty() {
             return Ok(skips);
         }
-        
+
         // Split by comma and parse each skip condition
         for part in list_str.split(',') {
             let part = part.trim();
@@ -212,24 +212,28 @@ impl Task {
                 skips.push(skip);
             }
         }
-        
+
         Ok(skips)
     }
 
     fn parse_single_skip(skip_str: &str) -> Result<Skip, String> {
         let skip_str = skip_str.trim();
         let parts: Vec<&str> = skip_str.split_whitespace().collect();
-        
+
         if parts.is_empty() {
             return Err("Empty skip condition".to_string());
         }
-        
+
         match parts[0] {
             "weekday" => {
                 if parts.len() != 2 {
-                    return Err(format!("Invalid weekday format: '{}'. Expected 'weekday N'", skip_str));
+                    return Err(format!(
+                        "Invalid weekday format: '{}'. Expected 'weekday N'",
+                        skip_str
+                    ));
                 }
-                let day = parts[1].parse::<u8>()
+                let day = parts[1]
+                    .parse::<u8>()
                     .map_err(|_| format!("Invalid weekday number: '{}'", parts[1]))?;
                 if day < 1 || day > 7 {
                     return Err(format!("Weekday must be between 1-7, got: {}", day));
@@ -238,43 +242,55 @@ impl Task {
             }
             "date" => {
                 if parts.len() != 2 {
-                    return Err(format!("Invalid date format: '{}'. Expected 'date YYYY-MM-DD'", skip_str));
+                    return Err(format!(
+                        "Invalid date format: '{}'. Expected 'date YYYY-MM-DD'",
+                        skip_str
+                    ));
                 }
                 let date_str = parts[1];
                 let date_parts: Vec<&str> = date_str.split('-').collect();
                 if date_parts.len() != 3 {
-                    return Err(format!("Invalid date format: '{}'. Expected 'YYYY-MM-DD'", date_str));
+                    return Err(format!(
+                        "Invalid date format: '{}'. Expected 'YYYY-MM-DD'",
+                        date_str
+                    ));
                 }
-                
-                let year = date_parts[0].parse::<i32>()
+
+                let year = date_parts[0]
+                    .parse::<i32>()
                     .map_err(|_| format!("Invalid year: '{}'", date_parts[0]))?;
-                let month = date_parts[1].parse::<u8>()
+                let month = date_parts[1]
+                    .parse::<u8>()
                     .map_err(|_| format!("Invalid month: '{}'", date_parts[1]))?;
-                let day = date_parts[2].parse::<u8>()
+                let day = date_parts[2]
+                    .parse::<u8>()
                     .map_err(|_| format!("Invalid day: '{}'", date_parts[2]))?;
-                
+
                 let month_enum = time::Month::try_from(month)
                     .map_err(|_| format!("Invalid month: {}", month))?;
                 let date = time::Date::from_calendar_date(year, month_enum, day)
                     .map_err(|_| format!("Invalid date: {}-{}-{}", year, month, day))?;
-                
+
                 Ok(Skip::Date(date))
             }
             "time" => {
                 if parts.len() != 2 {
-                    return Err(format!("Invalid time format: '{}'. Expected 'time HH:MM..HH:MM'", skip_str));
+                    return Err(format!(
+                        "Invalid time format: '{}'. Expected 'time HH:MM..HH:MM'",
+                        skip_str
+                    ));
                 }
                 let time_range = parts[1];
                 if let Some(range_pos) = time_range.find("..") {
                     let start_str = &time_range[..range_pos];
                     let end_str = &time_range[range_pos + 2..];
-                    
+
                     let format = format_description!("[hour]:[minute]");
                     let start_time = Time::parse(start_str, &format)
                         .map_err(|_| format!("Invalid start time: '{}'", start_str))?;
                     let end_time = Time::parse(end_str, &format)
                         .map_err(|_| format!("Invalid end time: '{}'", end_str))?;
-                    
+
                     Ok(Skip::TimeRange(start_time, end_time))
                 } else {
                     // Single time
@@ -284,7 +300,10 @@ impl Task {
                     Ok(Skip::Time(time))
                 }
             }
-            _ => Err(format!("Unknown skip type: '{}'. Supported types: weekday, date, time", parts[0])),
+            _ => Err(format!(
+                "Unknown skip type: '{}'. Supported types: weekday, date, time",
+                parts[0]
+            )),
         }
     }
 }
