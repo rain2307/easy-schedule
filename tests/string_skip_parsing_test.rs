@@ -4,10 +4,10 @@ use easy_schedule::Task;
 fn test_basic_tasks_without_skip() {
     let task = Task::parse("wait(10)").unwrap();
     assert!(matches!(task, Task::Wait(10, None)));
-    
+
     let task = Task::parse("interval(5)").unwrap();
     assert!(matches!(task, Task::Interval(5, None)));
-    
+
     let task = Task::parse("at(09:30)").unwrap();
     assert!(matches!(task, Task::At(_, None)));
 }
@@ -22,7 +22,7 @@ fn test_single_skip_conditions() {
     } else {
         panic!("Expected Wait task with skip");
     }
-    
+
     // Test date skip
     let task = Task::parse("interval(5, date 2024-12-25)").unwrap();
     if let Task::Interval(5, Some(skips)) = task {
@@ -31,7 +31,7 @@ fn test_single_skip_conditions() {
     } else {
         panic!("Expected Interval task with skip");
     }
-    
+
     // Test time range skip
     let task = Task::parse("at(09:30, time 12:00..13:00)").unwrap();
     if let Task::At(_, Some(skips)) = task {
@@ -53,7 +53,7 @@ fn test_multiple_skip_conditions() {
     } else {
         panic!("Expected Wait task with multiple skips");
     }
-    
+
     // Test mixed skip types
     let task = Task::parse("interval(5, [date 2024-12-25, time 12:00..13:00])").unwrap();
     if let Task::Interval(5, Some(skips)) = task {
@@ -69,13 +69,13 @@ fn test_multiple_skip_conditions() {
 fn test_error_cases() {
     // Invalid weekday
     assert!(Task::parse("wait(10, weekday 8)").is_err());
-    
+
     // Invalid month
     assert!(Task::parse("wait(10, date 2024-13-01)").is_err());
-    
+
     // Invalid time
     assert!(Task::parse("wait(10, time 25:00..26:00)").is_err());
-    
+
     // Invalid skip type
     assert!(Task::parse("wait(10, [weekday 6, invalid 7])").is_err());
 }
@@ -89,7 +89,7 @@ fn test_parsing_display() {
         "at(09:30, time 12:00..13:00)",
         "wait(10, [weekday 6, weekday 7])",
     ];
-    
+
     for test in tests {
         let task = Task::parse(test).unwrap();
         let display = format!("{}", task);
